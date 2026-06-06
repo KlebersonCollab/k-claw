@@ -1,10 +1,19 @@
-from typing import Annotated, TypedDict, List
+from typing import Annotated, TypedDict, List, Optional
 from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
 
+def replace_scratchpad(existing: Optional[List[BaseMessage]], new: Optional[List[BaseMessage]]) -> List[BaseMessage]:
+    """Reducer that replaces the scratchpad instead of appending, allowing it to be cleared."""
+    if new is None:
+        return []
+    return new
+
 class HarnessState(TypedDict):
-    # Standard LangGraph message history
+    # Standard LangGraph message history (Only User and Final AI responses)
     messages: Annotated[List[BaseMessage], add_messages]
+
+    # Ephemeral scratchpad for tools and intermediate thoughts within a turn
+    scratchpad: Annotated[List[BaseMessage], replace_scratchpad]
 
     # Harness specific metadata
     context_budget: int  # Max tokens before compaction
@@ -17,3 +26,4 @@ class HarnessState(TypedDict):
 
     # Flags
     incognito: bool # If True, don't log to DB
+    yolo: bool      # If True, bypass all approvals

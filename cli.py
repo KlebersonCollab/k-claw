@@ -2,6 +2,7 @@ import asyncio
 import uuid
 import sys
 import os
+import argparse
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
@@ -56,11 +57,16 @@ def display_session_history(messages):
             console.print(f"[dim italic green]Tool Result:[/dim italic green] {escape(str(msg.content[:100]))}...")
 
 async def run_cli():
+    parser = argparse.ArgumentParser(description="Agent Harness CLI")
+    parser.add_argument("--yolo", action="store_true", help="Bypass all security approvals")
+    args = parser.parse_args()
+
     # Set the global UI to this CLI implementation
     cli = CLIInterface()
     set_ui(cli)
 
-    console.print(Panel.fit("[bold blue]Agent Harness CLI v2.6[/bold blue]\n[env]AI Provider: [/env]" + os.getenv("AI_PROVIDER", "openai")))
+    yolo_status = " [bold red](YOLO MODE)[/bold red]" if args.yolo else ""
+    console.print(Panel.fit(f"[bold blue]Agent Harness CLI v2.6[/bold blue]{yolo_status}\n[env]AI Provider: [/env]" + os.getenv("AI_PROVIDER", "openai")))
 
     existing_sessions = SessionLogger.list_sessions()
     session_id = None
@@ -85,7 +91,7 @@ async def run_cli():
     harness_metadata = {
         "context_budget": 10, "iteration_count": 0, "session_id": session_id,
         "permissions": os.getenv("HARNESS_PERMISSIONS", "execute"),
-        "context_summary": "", "incognito": False
+        "context_summary": "", "incognito": False, "yolo": args.yolo
     }
 
     console.print(f"[bold green]Session ID:[/bold green] {session_id}")
@@ -101,19 +107,20 @@ async def run_cli():
             current_input = {"messages": [HumanMessage(content=user_input)], **harness_metadata}
 
         try:
-            # We track history to show only results (logic.py emits THINKING/TOOL events)
             prev_history_len = len(initial_messages) if 'current_state' not in locals() else len(current_state["messages"])
+
+            # Use streaming to catch intermediate events if we want, or just rely on the UI Event callbacks
+            # Since we implemented the EventBus (ui_interface), intermediate steps are already logged
+            # via console.print inside on_event (e.g., "Executing tool_name...").
+            # The final ainvoke result will just contain the cleaned-up "messages".
 
             current_state = await harness.ainvoke(current_input, config=config)
 
-            # Final output for Tool/Sub-agent results not handled by on_event
-            new_msgs = current_state["messages"][prev_history_len:]
+            # Display ONLY final AI responses from the main message history
+            new_msgs = current_state.get("messages", [])[prev_history_len:]
             for msg in new_msgs:
                 if isinstance(msg, AIMessage) and msg.content:
                     console.print(f"\n[bold magenta]Agent:[/bold magenta]\n{msg.content}\n")
-                elif isinstance(msg, ToolMessage):
-                    if "REPORT" in str(msg.content):
-                        console.print(f"[bold blue]Sub-Agent Report:[/bold blue] {escape(str(msg.content[:500]))}...")
 
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {str(e)}")

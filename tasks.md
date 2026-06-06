@@ -90,8 +90,19 @@ Este documento rastreia a evolução do Agent Harness com base nos princípios d
 - [x] **Proteção de Acesso**: Atualizadas as ferramentas `read_file` e `write_file` para impedir acesso a caminhos proibidos.
 - [x] **Protocolo de Busca em Camadas**: Atualizados os prompts dos especialistas para forçar o uso de `search_memory` antes de qualquer leitura em disco.
 - [x] **Performance (Lazy Loading)**: Implementado carregamento preguiçoso de embeddings, reduzindo a latência de inicialização em 300s.
-- [x] **Segurança de Commit (Pre-commit)**: Configurado framework `pre-commit` com scanner de segredos customizado para impedir vazamento de chaves de API.
-- [x] **Validação**: Testado bloqueio de `.venv` e proteção de chaves via pre-commit. ✅ Sucesso.
+- [x] **Segurança de Commit (Pre-commit)**: Configurado framework `pre-commit` com scanner de segredos customizado para impedir vazamento de chaves de API. ✅ Sucesso.
+
+### 17. Travas de Custo e Token Guardrails
+- [x] **Capping de Output**: Implementada função `cap_tool_output` que trunca respostas de ferramentas acima de 3000 caracteres, protegendo o contexto.
+- [x] **Compactação Proativa por Peso**: O Harness agora monitora o peso em tokens (estimado) e dispara a compactação se ultrapassar 15k tokens.
+- [x] **Prompt de Especialista Enxuto**: Removidos catálogos e contextos redundantes dos sub-agentes.
+- [x] **Ephemeral State (Anti-Hemingway)**: Refatorada a arquitetura LangGraph para usar um `scratchpad` temporário. O histórico persistente agora armazena apenas mensagens limpas, deletando loops internos de ferramentas para economizar milhares de tokens por turno. ✅ Sucesso.
+### 18. Fixes Críticos de Otimização (P0/P1)
+- [x] **Audit Bypass de Capping**: O retorno da ferramenta `delegate_to_agent` agora passa obrigatoriamente por `cap_tool_output(4000)`.
+- [x] **Depreciação do `search_memory` Legado**: A ferramenta `search_memory` padrão foi reescrita para usar a lógica de camadas (L1/L2/L3), forçando o agente a solicitar IDs específicos antes de baixar todo o conteúdo.
+- [x] **Limitação de Contexto Dinâmico**: O `context_summary` e o `dynamic_context` no System Prompt agora são limitados a 2000 caracteres via `cap_tool_output`.
+- [x] **Forçar Paginação em `read_file`**: Adicionado limite "hard" de 150 linhas por chamada em `read_file`. Se exceder, a saída é truncada com aviso para paginar.
+- [x] **Validação**: As correções garantem que nenhuma ferramenta ou delegação conseguirá poluir o contexto com blocos maiores que ~4000 caracteres. ✅ Sucesso.
 
 ## 🛠️ Fase 5: Harness Agnóstico & API Reativa
 

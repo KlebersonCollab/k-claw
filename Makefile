@@ -6,7 +6,7 @@ HOST = 0.0.0.0
 PORT = 8000
 PID_FILE = .api.pid
 
-.PHONY: install run start stop restart clean status help cli clear-memory logs setup-hooks
+.PHONY: install run start stop restart clean status help cli clear-memory logs setup-hooks generate-tools yolo
 
 help:
 	@echo "Available commands:"
@@ -18,26 +18,29 @@ help:
 	@echo "  make status       - Check if the API is running"
 	@echo "  make clean        - Remove temporary files and virtual environment"
 	@echo "  make cli          - Start the interactive CLI"
+	@echo "  make yolo         - Start the CLI in YOLO mode (no approvals)"
 	@echo "  make clear-memory - Wipe all sessions and long-term memory (DB)"
-	make setup-hooks    - Install pre-commit security hooks
-	make generate-tools - Consolidate tool manuals into TOOLS.md
-	make logs           - Show API logs
+	@echo "  make setup-hooks  - Install pre-commit security hooks"
+	@echo "  make generate-tools - Consolidate tool manuals into TOOLS.md"
+	@echo "  make logs         - Show API logs"
 
-	install:
+install:
 	uv sync
 
-	setup-hooks:
+setup-hooks:
 	uv run pre-commit install
 
-	generate-tools:
+generate-tools:
 	PYTHONPATH=. uv run python -c "from agent_loader import agent_loader; agent_loader.generate_tools_md()"
 
-	run:
-
+run:
 	uv run uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload
 
 cli:
 	uv run python cli.py
+
+yolo:
+	uv run python cli.py --yolo
 
 clear-memory:
 	@echo "Wiping all session data and long-term memory..."

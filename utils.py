@@ -78,6 +78,25 @@ def escape_rich(text: str) -> str:
     """Escapes Rich markup characters to prevent accidental formatting."""
     return str(text).replace("[", "[[").replace("]", "]]")
 
+def cap_tool_output(content: str, max_chars: int = 3000) -> str:
+    """Truncates tool output if it exceeds max_chars to save context tokens."""
+    if len(content) <= max_chars:
+        return content
+
+    return (
+        f"{content[:max_chars]}\n\n"
+        f"--- [TRUNCATED: Result too large ({len(content)} chars). "
+        f"Use paginated reading or more specific queries to see the rest.] ---"
+    )
+
+def estimate_tokens(messages: list) -> int:
+    """Roughly estimate tokens based on character count (1 token ~= 4 chars)."""
+    total_chars = 0
+    for msg in messages:
+        if hasattr(msg, 'content'):
+            total_chars += len(str(msg.content))
+    return int(total_chars / 4)
+
 def recursive_load_context(start_path: str = ".") -> str:
     """Walks up from start_path to root, collecting context files."""
     current_path = os.path.abspath(start_path)

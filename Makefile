@@ -19,16 +19,21 @@ help:
 	@echo "  make clean        - Remove temporary files and virtual environment"
 	@echo "  make cli          - Start the interactive CLI"
 	@echo "  make clear-memory - Wipe all sessions and long-term memory (DB)"
-	@echo "  make setup-hooks  - Install pre-commit security hooks"
-	@echo "  make logs         - Show API logs"
+	make setup-hooks    - Install pre-commit security hooks
+	make generate-tools - Consolidate tool manuals into TOOLS.md
+	make logs           - Show API logs
 
-install:
+	install:
 	uv sync
 
-setup-hooks:
+	setup-hooks:
 	uv run pre-commit install
 
-run:
+	generate-tools:
+	PYTHONPATH=. uv run python -c "from agent_loader import agent_loader; agent_loader.generate_tools_md()"
+
+	run:
+
 	uv run uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload
 
 cli:

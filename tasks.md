@@ -93,6 +93,17 @@ Este documento rastreia a evolução do Agent Harness com base nos princípios d
 - [x] **Segurança de Commit (Pre-commit)**: Configurado framework `pre-commit` com scanner de segredos customizado para impedir vazamento de chaves de API.
 - [x] **Validação**: Testado bloqueio de `.venv` e proteção de chaves via pre-commit. ✅ Sucesso.
 
-1. Leia o `tasks.md` para ver o status atual.
-2. Verifique o banco `harness.db` (se já criado) para validar o estado da persistência.
+## 🛠️ Fase 4: Manipulação Cirúrgica & Catálogo de Tools
+
+### 13. Surgical File I/O (Paginação e Protocolo)
+- [x] **`read_file` Paginado**: Ferramenta atualizada para aceitar `start_line` e `end_line`.
+- [x] **`edit_file` Cirúrgico**: Criada nova ferramenta para substituição de linhas.
+- [x] **Protocolo Existente vs Novo**: Implementada instrução rígida nos manuais: Surgical (Paginado) para arquivos existentes, Full para arquivos novos. ✅ Sucesso.
+
+### 14. Infraestrutura `.agents/tools/`
+- [x] **Catálogo Completo de Manuais**: Criados manuais para TODAS as ferramentas (`read_file`, `edit_file`, `write_file`, `list_directory`, `search_memory`, `delegate_to_agent`) com regras de ouro e fallbacks.
+- [x] **Lazy Tool Documentation**: Injeção dinâmica de manuais no contexto dos sub-agentes baseada em permissão.
+- [x] **TOOLS.md Unificado**: Gerado catálogo consolidado na raiz para referência humana e do orquestrador. ✅ Sucesso.
+
+
 3. Verifique se as dependências de vetores foram instaladas via `uv`.

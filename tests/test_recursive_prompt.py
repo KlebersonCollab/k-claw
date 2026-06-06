@@ -1,7 +1,7 @@
 import asyncio
 import os
 import shutil
-from logic import assemble_system_prompt
+from logic import _do_assemble_system_prompt as assemble_system_prompt
 from state import HarnessState
 
 async def test_recursive_context():

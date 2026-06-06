@@ -16,8 +16,9 @@ class HarnessState(TypedDict):
     scratchpad: Annotated[List[BaseMessage], replace_scratchpad]
 
     # Harness specific metadata
-    context_budget: int  # Max tokens before compaction
-    iteration_count: int # Safety cap
+    context_budget: int  # Max tokens/messages before compaction
+    max_iterations: int  # Max tool loops before termination
+    iteration_count: int # Current iteration count
     session_id: str      # For persistence
     permissions: str     # Current permission level (e.g., "read", "write", "admin")
 

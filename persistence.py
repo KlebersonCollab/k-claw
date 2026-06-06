@@ -42,9 +42,31 @@ class SessionLogger:
                 elif isinstance(msg, SystemMessage): role = "system"
                 elif isinstance(msg, ToolMessage): role = "tool"
                 else: role = "unknown"
-                new_msg = MessageModel(session_id=self.session_id, role=role, content=msg.content, additional_kwargs=json.dumps(msg.additional_kwargs))
+
+                usage_metadata = None
+                if hasattr(msg, 'usage_metadata') and msg.usage_metadata:
+                    usage_metadata = json.dumps(msg.usage_metadata)
+                    # Aggregate input + output tokens for accurate cost tracking
+                    input_tokens = msg.usage_metadata.get("input_tokens", 0)
+                    output_tokens = msg.usage_metadata.get("output_tokens", 0)
+                    total = input_tokens + output_tokens
+                    self._add_session_tokens(db, total)
+
+                new_msg = MessageModel(
+                    session_id=self.session_id,
+                    role=role,
+                    content=str(msg.content) if msg.content else "",
+                    additional_kwargs=json.dumps(msg.additional_kwargs),
+                    usage_metadata=usage_metadata
+                )
                 db.add(new_msg)
             db.commit()
+
+    def _add_session_tokens(self, db, tokens: int):
+        if tokens > 0:
+            session = db.query(SessionModel).filter(SessionModel.id == self.session_id).first()
+            if session:
+                session.total_tokens = (session.total_tokens or 0) + tokens
 
     def replay(self) -> List[Dict[str, Any]]:
         with SessionLocal() as db:
@@ -56,29 +78,33 @@ class SessionLogger:
             db_messages = db.query(MessageModel).filter(MessageModel.session_id == self.session_id).order_by(MessageModel.created_at).all()
             history = []
             for m in db_messages:
-                kwargs = json.loads(m.additional_kwargs)
+                kwargs = json.loads(m.additional_kwargs) if m.additional_kwargs else {}
+                if m.usage_metadata:
+                    kwargs['usage_metadata'] = json.loads(m.usage_metadata)
+
                 if m.role == "human": history.append(HumanMessage(content=m.content, **kwargs))
                 elif m.role == "ai": history.append(AIMessage(content=m.content, **kwargs))
                 elif m.role == "system": history.append(SystemMessage(content=m.content, **kwargs))
                 elif m.role == "tool": history.append(ToolMessage(content=m.content, **kwargs))
             return history
 
-    def search_messages(self, query: str) -> List[Dict[str, Any]]:
+    def search_messages(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
         from sqlalchemy import text
         with SessionLocal() as db:
-            # Sanitize FTS5 query (quoting it to handle special characters like dots)
             clean_q = query.replace('"', ' ')
             sanitized_query = f'"{clean_q}"'
-            sql = text("SELECT content, session_id, role, content_rowid FROM messages_fts WHERE messages_fts MATCH :q")
-            results = db.execute(sql, {"q": sanitized_query}).fetchall()
+            sql = text("SELECT content, session_id, role, content_rowid FROM messages_fts WHERE messages_fts MATCH :q LIMIT :limit")
+            results = db.execute(sql, {"q": sanitized_query, "limit": limit}).fetchall()
             return [{"content": r[0], "session_id": r[1], "role": r[2], "rowid": r[3]} for r in results]
 
     def create_long_term_memory(self, content: str, summary: str):
         vector = get_embeddings().embed_query(summary)
         with SessionLocal() as db:
             new_memory = MemoryModel(session_id=self.session_id, content=content, summary=summary, vector=json.dumps(vector))
-            db.add(new_memory); db.commit()
+            db.add(new_memory)
+            db.commit()
             memory_id = new_memory.id
+
             from sqlalchemy import text
             import struct
             with engine.connect() as conn:
@@ -115,7 +141,8 @@ class SessionLogger:
 
     @staticmethod
     def list_sessions() -> List[Dict[str, Any]]:
-        from persistence_db import SessionModel, SessionLocal
+        from persistence_db import SessionModel, SessionLocal, init_db
+        init_db()
         with SessionLocal() as db:
             sessions = db.query(SessionModel).order_by(SessionModel.created_at.desc()).all()
-            return [{"id": s.id, "created_at": s.created_at.isoformat()} for s in sessions]
+            return [{"id": s.id, "created_at": s.created_at.isoformat(), "total_tokens": s.total_tokens} for s in sessions]

@@ -89,7 +89,8 @@ async def run_cli():
     is_new_session = (len(initial_messages) == 0)
 
     harness_metadata = {
-        "context_budget": 10, "iteration_count": 0, "session_id": session_id,
+        "context_budget": 50, "max_iterations": 25, "iteration_count": 0,
+        "session_id": session_id,
         "permissions": os.getenv("HARNESS_PERMISSIONS", "execute"),
         "context_summary": "", "incognito": False, "yolo": args.yolo
     }

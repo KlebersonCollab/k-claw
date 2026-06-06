@@ -82,7 +82,6 @@ def cap_tool_output(content: str, max_chars: int = 3000) -> str:
     """Truncates tool output if it exceeds max_chars to save context tokens."""
     if len(content) <= max_chars:
         return content
-
     return (
         f"{content[:max_chars]}\n\n"
         f"--- [TRUNCATED: Result too large ({len(content)} chars). "
@@ -91,14 +90,22 @@ def cap_tool_output(content: str, max_chars: int = 3000) -> str:
 
 def estimate_tokens(messages: list) -> int:
     """Roughly estimate tokens based on character count (1 token ~= 4 chars)."""
+    if not messages: return 0
     total_chars = 0
     for msg in messages:
         if hasattr(msg, 'content'):
             total_chars += len(str(msg.content))
     return int(total_chars / 4)
 
+_CONTEXT_CACHE = {"data": None, "timestamp": 0}
+
 def recursive_load_context(start_path: str = ".") -> str:
-    """Walks up from start_path to root, collecting context files."""
+    """Walks up from start_path to root, collecting context files with a simple 60s cache."""
+    import time
+    now = time.time()
+    if _CONTEXT_CACHE["data"] is not None and (now - _CONTEXT_CACHE["timestamp"]) < 60:
+        return _CONTEXT_CACHE["data"]
+
     current_path = os.path.abspath(start_path)
     context_content = []
     visited_files = set()
@@ -116,4 +123,7 @@ def recursive_load_context(start_path: str = ".") -> str:
         if parent_path == current_path: break
         current_path = parent_path
 
-    return "\n".join(reversed(context_content))
+    result = "\n".join(reversed(context_content))
+    _CONTEXT_CACHE["data"] = result
+    _CONTEXT_CACHE["timestamp"] = now
+    return result

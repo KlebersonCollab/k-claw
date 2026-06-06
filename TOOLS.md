@@ -14,20 +14,6 @@ Use esta ferramenta para terceirizar tarefas complexas para especialistas.
 - **ESPECIALISTAS:** Use `coder` para código e `researcher` para análises.
 
 ---
-### Tool: edit_file
-Description: Surgically replaces a range of lines in an EXISTING file.
-Usage: edit_file(path='path/to/file', start_line=10, end_line=15, content='new content')
-
-Detailed Instructions:
-Esta é a ferramenta OBRIGATÓRIA para arquivos existentes.
-
-**REGRAS DE OURO:**
-- **EXISTENTE:** Use SEMPRE que o arquivo já existir no sistema.
-- **ZERO WASTE:** Substitua apenas as linhas necessárias para economizar tokens.
-- **FALLBACK:** Se o arquivo não existir, use `write_file` para criá-lo.
-- Se quiser ADICIONAR código entre as linhas 10 e 11, use `start_line=11, end_line=10`.
-
----
 ### Tool: list_directory
 Description: Lists files and folders, respecting project ignore rules.
 Usage: list_directory(path='.')
@@ -51,6 +37,19 @@ Use esta ferramenta para ler o conteúdo de arquivos.
 - **EXISTENTE:** Se o arquivo já existe, você DEVE usar `start_line` e `end_line` para ler apenas o necessário.
 - **NOVO/PEQUENO:** Leitura completa permitida apenas se o arquivo tiver menos de 50 linhas.
 - **FALLBACK:** Se a leitura falhar, tente listar o diretório para confirmar o caminho.
+
+---
+### Tool: replace_string
+Description: Surgically replaces a specific exact string block in an EXISTING file.
+Usage: replace_string(path='path/to/file', old_string='exact old text', new_string='new text')
+
+Detailed Instructions:
+Esta é a ferramenta OBRIGATÓRIA para modificação de código em arquivos existentes.
+
+**REGRAS DE OURO:**
+- **EXATIDÃO:** O parâmetro `old_string` deve ser uma cópia EXATA do texto que está no arquivo (incluindo espaços e quebras de linha). Se não for exato, a ferramenta falhará.
+- **CONTEXTO ÚNICO:** Se o trecho de código se repetir no arquivo, adicione mais linhas de contexto (antes ou depois) no `old_string` para garantir que o match seja único (ocorrência = 1).
+- **SUBSTITUIÇÃO, NÃO CRIAÇÃO:** Se o arquivo não existir, use `write_file` para criá-lo.
 
 ---
 ### Tool: search_memory

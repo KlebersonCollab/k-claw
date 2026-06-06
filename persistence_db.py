@@ -10,6 +10,7 @@ class SessionModel(Base):
     __tablename__ = 'sessions'
     id = Column(String, primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    total_tokens = Column(Integer, default=0)  # Accumulated token usage for the session
     messages = relationship("MessageModel", back_populates="session")
     events = relationship("EventModel", back_populates="session")
 
@@ -20,6 +21,7 @@ class MessageModel(Base):
     role = Column(String) # human, ai, tool, system
     content = Column(Text)
     additional_kwargs = Column(Text) # JSON string
+    usage_metadata = Column(Text, nullable=True) # JSON string: {input_tokens, output_tokens, total_tokens}
     created_at = Column(DateTime, default=datetime.utcnow)
 
     session = relationship("SessionModel", back_populates="messages")
@@ -61,11 +63,23 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     Base.metadata.create_all(bind=engine)
-    # Manual SQL for FTS5, WAL mode and Triggers
+    # Manual SQL for FTS5, WAL mode, Triggers, and migrations
     with engine.connect() as conn:
         # Enable WAL mode for concurrency
         conn.execute(text("PRAGMA journal_mode=WAL;"))
         conn.execute(text("PRAGMA synchronous=NORMAL;"))
+
+        # Migration: add usage_metadata to messages if missing
+        result = conn.execute(text("PRAGMA table_info(messages);"))
+        msg_cols = {row[1] for row in result.fetchall()}
+        if "usage_metadata" not in msg_cols:
+            conn.execute(text("ALTER TABLE messages ADD COLUMN usage_metadata TEXT;"))
+
+        # Migration: add total_tokens to sessions if missing
+        result = conn.execute(text("PRAGMA table_info(sessions);"))
+        sess_cols = {row[1] for row in result.fetchall()}
+        if "total_tokens" not in sess_cols:
+            conn.execute(text("ALTER TABLE sessions ADD COLUMN total_tokens INTEGER DEFAULT 0;"))
 
         # Create FTS5 virtual table
         conn.execute(text("CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content, session_id UNINDEXED, role UNINDEXED, content_rowid UNINDEXED);"))

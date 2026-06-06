@@ -2,29 +2,52 @@ import os
 import asyncio
 from datetime import datetime
 from typing import Literal, Dict, Any
-from rich.console import Console
-from rich.panel import Panel
-from rich.prompt import Confirm
-from rich.markup import escape
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from state import HarnessState
 from tools import registry, classify_shell_command, risk_level_value
 from persistence import SessionLogger
 from dotenv import load_dotenv
 from agent_loader import agent_loader
-from utils import get_model, redact_sensitive_info, recursive_load_context, cap_tool_output, estimate_tokens
+from utils import get_model, redact_sensitive_info, recursive_load_context, estimate_tokens, cap_tool_output
 from ui_interface import get_ui, EventType
 from hooks import hook_manager
 
 load_dotenv()
-console = Console()
+
+# System prompt cache: session_id -> (permissions, context_summary, SystemMessage)
+_SYS_PROMPT_CACHE: Dict[str, tuple] = {}
+
+def _build_cache_key(state: HarnessState) -> str:
+    """Build a cache key from session_id + fields that affect the prompt."""
+    return f"{state['session_id']}:{state['permissions']}:{hash(state.get('context_summary', ''))}"
+
+def get_cached_system_prompt(state: HarnessState) -> SystemMessage:
+    """Return cached system prompt or build and cache it.
+
+    The prompt is rebuilt only when session_id, permissions, or context_summary change.
+    This avoids reconstructing the full prompt (with agent catalog and context files)
+    on every single turn.
+    """
+    cache_key = _build_cache_key(state)
+    if cache_key in _SYS_PROMPT_CACHE:
+        return _SYS_PROMPT_CACHE[cache_key][2]
+
+    sys_msg = _do_assemble_system_prompt(state)
+    _SYS_PROMPT_CACHE[cache_key] = (state['permissions'], state.get('context_summary', ''), sys_msg)
+    return sys_msg
+
+def invalidate_system_prompt_cache(session_id: str) -> None:
+    """Invalidate all cached prompts for a given session (e.g. after compaction)."""
+    keys_to_remove = [k for k in _SYS_PROMPT_CACHE if k.startswith(f"{session_id}:")]
+    for k in keys_to_remove:
+        del _SYS_PROMPT_CACHE[k]
 
 async def emit_event(event_type: EventType, data: Dict[str, Any] = None):
     ui = get_ui()
     if ui:
         await ui.on_event(event_type, data or {})
 
-def assemble_system_prompt(state: HarnessState) -> SystemMessage:
+def _do_assemble_system_prompt(state: HarnessState) -> SystemMessage:
     is_sub_agent = state['session_id'].startswith("sub-")
 
     if is_sub_agent:
@@ -38,9 +61,11 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     base_prompt = (
         "You are the Orchestrator Agent (Father).\n"
         "STRICT PROTOCOL:\n"
-        "1. DELEGATE ALL technical tasks to specialists.\n"
-        "2. Review the specialist's REPORT and relay the conclusion.\n"
-        "3. TOKEN SAFETY: Huge tool outputs are truncated. Use specialists to analyze large data."
+        "1. DELEGATE ALL technical tasks (reading/writing files, shell commands, research) to the appropriate specialist.\n"
+        "2. You are responsible for identifying WHICH specialist is needed and providing a detailed MISSION briefing.\n"
+        "3. Review the specialist's REPORT and relay the conclusion to the user.\n"
+        "4. ANTI-HALLUCINATION: Never invent file contents or tool results. If delegation fails, report the error.\n"
+        "5. TOKEN SAFETY: Huge tool outputs are truncated. Use specialists to analyze large data."
     )
     available_agents = agent_loader.list_available_agents()
     agents_catalog = "\n\n### Specialists:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])
@@ -59,16 +84,14 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
 
     return SystemMessage(content=prompt_content)
 
-
 async def call_model(state: HarnessState):
     agent_name = "Orchestrator" if not state['session_id'].startswith("sub-") else f"Specialist {state['session_id'].split('-')[1]}"
 
     await emit_event(EventType.THINKING_START, {"agent": agent_name, "session_id": state['session_id']})
 
     model = get_model()
-    sys_msg = assemble_system_prompt(state)
+    sys_msg = get_cached_system_prompt(state)
 
-    # Combine main history and current scratchpad for the LLM
     scratchpad = state.get("scratchpad", [])
     messages_for_llm = [sys_msg] + state["messages"] + scratchpad
 
@@ -80,40 +103,39 @@ async def call_model(state: HarnessState):
 
     clean_content = redact_sensitive_info(response.content) if response.content else ""
 
-    # If the response has tool calls, it's an intermediate step -> goes to scratchpad
     if response.tool_calls:
-        # We append the AI's tool request to the scratchpad
         new_scratchpad = scratchpad + [response]
         return {
             "scratchpad": new_scratchpad,
             "iteration_count": state["iteration_count"] + 1,
         }
     else:
-        # If no tools are called, it's the final answer -> goes to messages, and we clear the scratchpad
         if not state.get("incognito", False):
             logger = SessionLogger(state["session_id"])
-            logger.log_event("model_call", {"response": redact_sensitive_info(str(response))})
+            # Log minimal event info instead of full response string
+            logger.log_event("model_call", {"has_content": bool(clean_content), "tool_calls": len(response.tool_calls)})
             log_response = response.copy()
             log_response.content = clean_content
             logger.log_messages([log_response])
 
         return {
             "messages": [response],
-            "scratchpad": None, # Clear scratchpad
+            "scratchpad": None,
             "iteration_count": state["iteration_count"] + 1,
         }
 
 def should_continue(state: HarnessState) -> Literal["tools", "compact", "__end__"]:
-    # The condition is now based on the scratchpad, as tools are only in the scratchpad
     scratchpad = state.get("scratchpad", [])
 
-    if state["iteration_count"] > 25: return "__end__"
+    # Use max_iterations from state (default to 25 if not present)
+    max_iters = state.get("max_iterations", 25)
+    if state["iteration_count"] > max_iters: return "__end__"
 
     if scratchpad and scratchpad[-1].tool_calls:
-        # PROACTIVE COMPACTION: Check token weight instead of just message count
-        token_count = estimate_tokens(state["messages"])
-        # If context > 15k tokens (~60k chars), force compaction before next tool
-        if token_count > 15000 or len(state["messages"]) > state["context_budget"]:
+        # Include scratchpad in token count to detect long turns
+        token_count = estimate_tokens(state["messages"] + scratchpad)
+        # Increased message threshold to 50 to allow more turns before summarizing
+        if token_count > 35000 or len(state["messages"]) > state.get("context_budget", 50):
             return "compact"
         return "tools"
 
@@ -122,7 +144,6 @@ def should_continue(state: HarnessState) -> Literal["tools", "compact", "__end__
 async def compact_context(state: HarnessState):
     await emit_event(EventType.COMPACTION_START)
     model = get_model()
-    # Keep only the last 4 messages to really prune the context
     to_prune = state["messages"][:-4]
 
     compaction_prompt = "Produce a highly technical State Memo (DECISIONS, STATUS, PENDING, CONTEXT)."
@@ -133,6 +154,9 @@ async def compact_context(state: HarnessState):
     logger = SessionLogger(state["session_id"])
     try: logger.create_long_term_memory(content=str(to_prune), summary=state_memo)
     except: pass
+
+    # Invalidate system prompt cache since context_summary changed
+    invalidate_system_prompt_cache(state["session_id"])
 
     await emit_event(EventType.COMPACTION_END, {"memo": state_memo})
     return {
@@ -156,7 +180,19 @@ async def execute_tools(state: HarnessState):
         if tool_name == "delegate_to_agent":
             tool_args["parent_yolo"] = yolo_mode
 
-        # HITL Verification
+        # PRE-TOOL HOOKS
+        hook_result = await hook_manager.run_pre_tool(
+            tool_name, tool_args,
+            {"session_id": state["session_id"], "permissions": state["permissions"]}
+        )
+
+        if not hook_result.allowed:
+            tool_messages.append(ToolMessage(tool_call_id=tool_call["id"], content=f"ERROR: Tool '{tool_name}' denied by hook."))
+            continue
+
+        tool_args = hook_result.modified_args
+
+        # HITL DECISION
         needs_approval = False
         if not yolo_mode and desc and desc.requires_approval:
             needs_approval = True
@@ -172,25 +208,32 @@ async def execute_tools(state: HarnessState):
                 tool_messages.append(ToolMessage(tool_call_id=tool_call["id"], content="ERROR: Denied by user."))
                 continue
 
-        # Execution
+        # EXECUTION
         await emit_event(EventType.TOOL_START, {"tool": tool_name, "args": tool_args})
         if desc:
             try: result = await desc.handler.ainvoke(tool_args)
             except Exception as e: result = f"Error: {str(e)}"
         else: result = f"Error: Tool {tool_name} not found."
 
-        # TOOL OUTPUT CAPPING (The Token Guardrail)
+        # Capping ensures ALL tool outputs are truncated if too large
         capped_result = cap_tool_output(str(result))
         clean_result = redact_sensitive_info(capped_result)
 
         if not state.get("incognito", False):
-            logger.log_event("tool_execution", {"tool": tool_name, "result": clean_result})
+            # Reduced log verbosity: Don't log full content in event
+            logger.log_event("tool_execution", {"tool": tool_name, "status": "completed"})
 
         await emit_event(EventType.TOOL_END, {"tool": tool_name, "result": clean_result})
+
+        # POST-TOOL HOOKS
+        await hook_manager.run_post_tool(
+            tool_name, tool_args, clean_result,
+            {"session_id": state["session_id"]}
+        )
+
         tool_messages.append(ToolMessage(tool_call_id=tool_call["id"], content=clean_result))
 
     if not state.get("incognito", False): logger.log_messages(tool_messages)
 
-    # Tool results go to the scratchpad, not the main messages list
     new_scratchpad = scratchpad + tool_messages
     return {"scratchpad": new_scratchpad}

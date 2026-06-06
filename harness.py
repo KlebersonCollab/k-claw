@@ -23,8 +23,8 @@ def create_harness():
         should_continue,
     )
 
-    # Edge from compact back to tools
-    workflow.add_edge("compact", "tools")
+    # Edge from compact back to agent
+    workflow.add_edge("compact", "agent")
 
     # Edge from tools back to agent
     workflow.add_edge("tools", "agent")

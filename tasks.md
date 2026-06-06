@@ -93,17 +93,18 @@ Este documento rastreia a evolução do Agent Harness com base nos princípios d
 - [x] **Segurança de Commit (Pre-commit)**: Configurado framework `pre-commit` com scanner de segredos customizado para impedir vazamento de chaves de API.
 - [x] **Validação**: Testado bloqueio de `.venv` e proteção de chaves via pre-commit. ✅ Sucesso.
 
-## 🛠️ Fase 4: Manipulação Cirúrgica & Catálogo de Tools
+## 🛠️ Fase 5: Harness Agnóstico & API Reativa
 
-### 13. Surgical File I/O (Paginação e Protocolo)
-- [x] **`read_file` Paginado**: Ferramenta atualizada para aceitar `start_line` e `end_line`.
-- [x] **`edit_file` Cirúrgico**: Criada nova ferramenta para substituição de linhas.
-- [x] **Protocolo Existente vs Novo**: Implementada instrução rígida nos manuais: Surgical (Paginado) para arquivos existentes, Full para arquivos novos. ✅ Sucesso.
+### 15. Desacoplamento de Interface (UI-Agnostic)
+- [x] **Interface Callback/EventBus**: Criada a classe base `UIInterface` em `ui_interface.py` e integrado o sistema de eventos no `logic.py` (THINKING, TOOL, APPROVAL).
+- [x] **Refatorar CLI**: O `cli.py` foi transformado em uma implementação de `UIInterface`, reagindo a eventos para gerenciar o console Rich.
+- [x] **Validação**: CLI validado com feedback visual via eventos. ✅ Sucesso.
 
-### 14. Infraestrutura `.agents/tools/`
-- [x] **Catálogo Completo de Manuais**: Criados manuais para TODAS as ferramentas (`read_file`, `edit_file`, `write_file`, `list_directory`, `search_memory`, `delegate_to_agent`) com regras de ouro e fallbacks.
-- [x] **Lazy Tool Documentation**: Injeção dinâmica de manuais no contexto dos sub-agentes baseada em permissão.
-- [x] **TOOLS.md Unificado**: Gerado catálogo consolidado na raiz para referência humana e do orquestrador. ✅ Sucesso.
+### 16. API REST v2 (HITL & Streaming)
+- [x] **Streaming de Eventos**: Implementado endpoint `/chat` com `StreamingResponse` (SSE) que reporta o progresso do agente em tempo real.
+- [x] **Fluxo de Aprovação HTTP**: Criado sistema de `Futures` e endpoint `POST /approve/{id}` para pausar e retomar a execução via web.
+- [x] **Gestão de Sessão no Banco**: API integrada ao `SessionLogger` para persistência e recuperação automática de contexto.
+- [x] **Validação**: Testado via `curl` com streaming de eventos. ✅ Sucesso.
 
 
 3. Verifique se as dependências de vetores foram instaladas via `uv`.

@@ -11,21 +11,56 @@ from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from harness import harness
 from persistence import SessionLogger
 from dotenv import load_dotenv
+from ui_interface import UIInterface, EventType, set_ui
 
 load_dotenv()
 console = Console()
+
+class CLIInterface(UIInterface):
+    def __init__(self):
+        self.status = None
+
+    async def on_event(self, event_type: EventType, data: dict):
+        if event_type == EventType.THINKING_START:
+            self.status = console.status(f"[bold cyan]{data.get('agent', 'Agent')} is thinking...[/bold cyan]")
+            self.status.start()
+        elif event_type == EventType.THINKING_END:
+            if self.status:
+                self.status.stop()
+                self.status = None
+        elif event_type == EventType.TOOL_START:
+            console.print(f"[dim green]Executing {data.get('tool')}...[/dim green]")
+        elif event_type == EventType.TOOL_END:
+            pass # We show results via message history
+        elif event_type == EventType.COMPACTION_START:
+            console.print("[bold yellow]Compacting context...[/bold yellow]")
+        elif event_type == EventType.ERROR:
+            console.print(f"[bold red]Error:[/bold red] {data.get('message')}")
+
+    async def request_approval(self, tool_name: str, args: dict) -> bool:
+        if self.status: self.status.stop()
+        console.print("\n")
+        console.print(Panel(f"[bold red]⚠️ Verification Needed[/bold red]\n[yellow]Tool:[/yellow] {tool_name}\n[yellow]Args:[/yellow] {escape(str(args))}",
+                            title="Action Pending", border_style="red"))
+        approved = await asyncio.to_thread(Confirm.ask, f"Allow {tool_name}?")
+        if self.status: self.status.start()
+        return approved
 
 def display_session_history(messages):
     for msg in messages:
         if isinstance(msg, HumanMessage):
             console.print(f"[bold yellow]You:[/bold yellow] {msg.content}")
         elif isinstance(msg, AIMessage):
-            if msg.content: console.print(f"[bold magenta]Agent:[/bold magenta] {msg.content}")
+            if msg.content: console.print(f"\n[bold magenta]Agent:[/bold magenta]\n{msg.content}\n")
         elif isinstance(msg, ToolMessage):
-            console.print(f"[dim italic green]Tool Result:[/dim italic green] {msg.content[:100]}...")
+            console.print(f"[dim italic green]Tool Result:[/dim italic green] {escape(str(msg.content[:100]))}...")
 
 async def run_cli():
-    console.print(Panel.fit("[bold blue]Agent Harness CLI v2.5[/bold blue]\n[env]AI Provider: [/env]" + os.getenv("AI_PROVIDER", "openai")))
+    # Set the global UI to this CLI implementation
+    cli = CLIInterface()
+    set_ui(cli)
+
+    console.print(Panel.fit("[bold blue]Agent Harness CLI v2.6[/bold blue]\n[env]AI Provider: [/env]" + os.getenv("AI_PROVIDER", "openai")))
 
     existing_sessions = SessionLogger.list_sessions()
     session_id = None
@@ -66,14 +101,20 @@ async def run_cli():
             current_input = {"messages": [HumanMessage(content=user_input)], **harness_metadata}
 
         try:
-            # We don't use global status here anymore. Nodes manage their own.
+            # We track history to show only results (logic.py emits THINKING/TOOL events)
+            prev_history_len = len(initial_messages) if 'current_state' not in locals() else len(current_state["messages"])
+
             current_state = await harness.ainvoke(current_input, config=config)
 
-            # Final AI response display
-            # (Sub-agents and Tool results were already printed by nodes in logic.py)
-            last_msg = current_state["messages"][-1]
-            if isinstance(last_msg, AIMessage) and last_msg.content:
-                console.print(f"\n[bold magenta]Agent:[/bold magenta]\n{last_msg.content}\n")
+            # Final output for Tool/Sub-agent results not handled by on_event
+            new_msgs = current_state["messages"][prev_history_len:]
+            for msg in new_msgs:
+                if isinstance(msg, AIMessage) and msg.content:
+                    console.print(f"\n[bold magenta]Agent:[/bold magenta]\n{msg.content}\n")
+                elif isinstance(msg, ToolMessage):
+                    if "REPORT" in str(msg.content):
+                        console.print(f"[bold blue]Sub-Agent Report:[/bold blue] {escape(str(msg.content[:500]))}...")
+
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {str(e)}")
 

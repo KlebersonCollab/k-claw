@@ -74,6 +74,10 @@ def redact_sensitive_info(text: str) -> str:
         redacted = re.sub(pattern, "[REDACTED]", redacted)
     return redacted
 
+def escape_rich(text: str) -> str:
+    """Escapes Rich markup characters to prevent accidental formatting."""
+    return str(text).replace("[", "[[").replace("]", "]]")
+
 def recursive_load_context(start_path: str = ".") -> str:
     """Walks up from start_path to root, collecting context files."""
     current_path = os.path.abspath(start_path)

@@ -1,11 +1,7 @@
 import os
 import asyncio
 from datetime import datetime
-from typing import Literal
-from rich.console import Console
-from rich.panel import Panel
-from rich.prompt import Confirm
-from rich.markup import escape
+from typing import Literal, Dict, Any
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from state import HarnessState
 from tools import registry
@@ -13,14 +9,18 @@ from persistence import SessionLogger
 from dotenv import load_dotenv
 from agent_loader import agent_loader
 from utils import get_model, redact_sensitive_info, recursive_load_context
+from ui_interface import get_ui, EventType
 
 load_dotenv()
-console = Console()
+
+async def emit_event(event_type: EventType, data: Dict[str, Any] = None):
+    ui = get_ui()
+    if ui:
+        await ui.on_event(event_type, data or {})
 
 def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     is_sub_agent = state['session_id'].startswith("sub-")
 
-    # 1. SPECIALIST PROMPT (Ultra-Light)
     if is_sub_agent:
         return SystemMessage(content=(
             "You are a Specialist Sub-Agent. Focus strictly on your technical mission.\n"
@@ -28,7 +28,6 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
             "ANTI-HALLUCINATION: If a tool fails, report the error. NEVER guess contents."
         ))
 
-    # 2. ORCHESTRATOR PROMPT (Pure Orchestration)
     base_prompt = (
         "You are the Orchestrator Agent (Father).\n"
         "STRICT PROTOCOL:\n"
@@ -51,13 +50,17 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
 
 async def call_model(state: HarnessState):
     agent_name = "Orchestrator" if not state['session_id'].startswith("sub-") else f"Specialist {state['session_id'].split('-')[1]}"
-    with console.status(f"[bold cyan]{agent_name} is thinking...[/bold cyan]"):
-        model = get_model()
-        sys_msg = assemble_system_prompt(state)
-        messages = [sys_msg] + state["messages"]
-        authorized_tools = registry.get_langchain_tools(state["permissions"])
-        model_with_tools = model.bind_tools(authorized_tools)
-        response = await model_with_tools.ainvoke(messages)
+
+    await emit_event(EventType.THINKING_START, {"agent": agent_name, "session_id": state['session_id']})
+
+    model = get_model()
+    sys_msg = assemble_system_prompt(state)
+    messages = [sys_msg] + state["messages"]
+    authorized_tools = registry.get_langchain_tools(state["permissions"])
+    model_with_tools = model.bind_tools(authorized_tools)
+    response = await model_with_tools.ainvoke(messages)
+
+    await emit_event(EventType.THINKING_END, {"agent": agent_name})
 
     clean_content = redact_sensitive_info(response.content) if response.content else ""
     if not state.get("incognito", False):
@@ -77,40 +80,54 @@ def should_continue(state: HarnessState) -> Literal["tools", "compact", "__end__
     return "__end__"
 
 async def compact_context(state: HarnessState):
-    with console.status("[bold yellow]Compacting...[/bold yellow]"):
-        model = get_model()
-        to_prune = state["messages"][:-5]
-        memo_request = [SystemMessage(content="Produce a technical State Memo."), HumanMessage(content=f"History:\n{to_prune}")]
-        resp = await model.ainvoke(memo_request)
-        state_memo = resp.content
-        logger = SessionLogger(state["session_id"])
-        try: logger.create_long_term_memory(content=str(to_prune), summary=state_memo)
-        except: pass
-        return {"messages": state["messages"][-5:], "context_summary": state_memo}
+    await emit_event(EventType.COMPACTION_START)
+    model = get_model()
+    to_prune = state["messages"][:-5]
+    memo_request = [SystemMessage(content="Produce a technical State Memo."), HumanMessage(content=f"History:\n{to_prune}")]
+    resp = await model.ainvoke(memo_request)
+    state_memo = resp.content
+    logger = SessionLogger(state["session_id"])
+    try: logger.create_long_term_memory(content=str(to_prune), summary=state_memo)
+    except: pass
+    await emit_event(EventType.COMPACTION_END, {"memo": state_memo})
+    return {"messages": state["messages"][-5:], "context_summary": state_memo}
 
 async def execute_tools(state: HarnessState):
     last_message = state["messages"][-1]
     tool_messages = []
     logger = SessionLogger(state["session_id"])
+    ui = get_ui()
+
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]; tool_args = tool_call["args"]
         desc = registry.tools.get(tool_name)
+
+        # 1. Verification (via UI Interface)
         if desc and desc.requires_approval:
-            console.print("\n")
-            console.print(Panel(f"[bold red]⚠️ Verification Needed[/bold red]\n[yellow]Tool:[/yellow] {tool_name}\n[yellow]Args:[/yellow] {escape(str(tool_args))}", title="Action Pending", border_style="red"))
-            approved = await asyncio.to_thread(Confirm.ask, f"Allow {tool_name}?")
+            if ui:
+                approved = await ui.request_approval(tool_name, tool_args)
+            else:
+                approved = False # Safe default
+
             if not approved:
                 tool_messages.append(ToolMessage(tool_call_id=tool_call["id"], content="ERROR: Execution denied by user."))
                 continue
-        if tool_name != "delegate_to_agent":
-            console.print(f"[dim green]Executing {tool_name}...[/dim green]")
+
+        # 2. Execution
+        await emit_event(EventType.TOOL_START, {"tool": tool_name, "args": tool_args})
+
         if desc:
             try: result = await desc.handler.ainvoke(tool_args)
             except Exception as e: result = f"Error: {str(e)}"
         else: result = f"Error: Tool {tool_name} not found."
+
         clean_result = redact_sensitive_info(str(result))
         if not state.get("incognito", False):
             logger.log_event("tool_execution", {"tool": tool_name, "result": clean_result})
+
+        await emit_event(EventType.TOOL_END, {"tool": tool_name, "result": clean_result})
         tool_messages.append(ToolMessage(tool_call_id=tool_call["id"], content=clean_result))
+
     if not state.get("incognito", False): logger.log_messages(tool_messages)
     return {"messages": tool_messages}
+from typing import Dict

@@ -66,8 +66,11 @@ class SessionLogger:
     def search_messages(self, query: str) -> List[Dict[str, Any]]:
         from sqlalchemy import text
         with SessionLocal() as db:
+            # Sanitize FTS5 query (quoting it to handle special characters like dots)
+            clean_q = query.replace('"', ' ')
+            sanitized_query = f'"{clean_q}"'
             sql = text("SELECT content, session_id, role, content_rowid FROM messages_fts WHERE messages_fts MATCH :q")
-            results = db.execute(sql, {"q": query}).fetchall()
+            results = db.execute(sql, {"q": sanitized_query}).fetchall()
             return [{"content": r[0], "session_id": r[1], "role": r[2], "rowid": r[3]} for r in results]
 
     def create_long_term_memory(self, content: str, summary: str):

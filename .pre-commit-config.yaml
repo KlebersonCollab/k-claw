@@ -1,0 +1,18 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    -   id: check-added-large-files
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+    -   id: trailing-whitespace
+    -   id: detect-private-key
+
+-   repo: local
+    hooks:
+    -   id: check-secrets
+        name: Check for AI API Keys
+        entry: python scripts/check_secrets.py
+        language: python
+        types: [text]
+        exclude: ^.env.template$|^scripts/check_secrets.py$

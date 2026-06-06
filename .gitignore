@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Env
+.env
+
+# Database
+harness.db
+harness.db-shm
+harness.db-wal
+harness.db-journal
+
+# Logs
+harness.log
+harness.log.*

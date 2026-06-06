@@ -1,0 +1,44 @@
+[project]
+name = "python-project-template"
+version = "0.1.0"
+description = "A modern Python project template using uv"
+authors = [{ name = "Kleberson Romero", email = "contato@klebersonromero.com" }]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+# Target Python version
+target-version = "py312"
+line-length = 88
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --doctest-modules"
+testpaths = [
+    "tests",
+    "src",
+]
+pythonpath = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/my_package"]

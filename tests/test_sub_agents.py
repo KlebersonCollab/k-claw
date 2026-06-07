@@ -1,28 +1,15 @@
-import asyncio
-import os
-from langchain_core.messages import HumanMessage, AIMessage
-from tools import delegate_to_agent
-from agent_loader import agent_loader
+import pytest
+from tools import registry
+from infra.agent_loader import agent_loader
 
-async def test_sub_agent_delegation():
+def test_sub_agent_delegation_infrastructure():
     # 1. Verify loader can find our test agents
     available = agent_loader.list_available_agents()
-    ids = [a['id'] for i, a in enumerate(available)]
-    print(f"Available agents: {ids}")
+    ids = [a['id'] for a in available]
     assert "coder" in ids
     assert "researcher" in ids
 
-    # 2. Test delegation logic (Mocking or running real)
-    # We'll test the tool invocation
-    print("Testing delegation to 'researcher'...")
-    # This might call the real LLM if configured, so we'll just check the setup
-    # unless we want a full integration test.
-    # For now, let's just ensure the tool is registered.
-    from tools import registry
+    # 2. Verify tool registration
     assert "delegate_to_agent" in registry.tools
-    assert registry.tools["delegate_to_agent"].requires_approval == True
-
-    print("✅ Sub-Agent Delegation Infrastructure Validated!")
-
-if __name__ == "__main__":
-    asyncio.run(test_sub_agent_delegation())
+    # In the new registry, permissions and approval are properties of the descriptor
+    assert registry.tools["delegate_to_agent"].permissions_required == "read"

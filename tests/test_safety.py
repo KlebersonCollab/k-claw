@@ -1,5 +1,5 @@
 import pytest
-from utils import path_filter
+from core.utils import path_filter
 from tools import list_directory, read_file
 
 @pytest.mark.asyncio
@@ -19,7 +19,9 @@ async def test_list_directory_ignore():
     assert ".venv" not in items
     assert ".git" not in items
     assert ".git/" not in items
-    assert "api.py" in items
+    assert "core/" in items
+    assert "infra/" in items
+    assert "entrypoints/" in items
 
 @pytest.mark.asyncio
 async def test_read_file_protection():

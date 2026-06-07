@@ -6,10 +6,10 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from harness import harness
-from persistence import SessionLogger
+from core.harness import harness
+from infra.persistence import SessionLogger
 from dotenv import load_dotenv
-from ui_interface import UIInterface, EventType, set_ui
+from core.ui_interface import UIInterface, EventType, set_ui
 
 load_dotenv()
 

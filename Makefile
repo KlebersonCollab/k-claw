@@ -1,12 +1,13 @@
 # Makefile for Agent Harness
 
 # Variables
-APP_MODULE = api:app
+APP_MODULE = entrypoints.api:app
 HOST = 0.0.0.0
 PORT = 8000
 PID_FILE = .api.pid
+BOT_PID = .bot.pid
 
-.PHONY: install run start stop restart clean status help cli clear-memory logs setup-hooks generate-tools yolo setup test
+.PHONY: install run start stop restart clean status help cli bot bot-start bot-stop bot-status clear-memory logs setup-hooks generate-tools yolo setup test
 
 help:
 	@echo "Available commands:"
@@ -19,6 +20,10 @@ help:
 	@echo "  make status       - Check if the API is running"
 	@echo "  make clean        - Remove temporary files and virtual environment"
 	@echo "  make cli          - Start the interactive CLI"
+	@echo "  make bot          - Start the Telegram bot in foreground"
+	@echo "  make bot-start    - Start the bot in background"
+	@echo "  make bot-stop     - Stop the background bot process"
+	@echo "  make bot-status   - Check if the bot is running"
 	@echo "  make yolo         - Start the CLI in YOLO mode (no approvals)"
 	@echo "  make clear-memory - Wipe all sessions and long-term memory (DB)"
 	@echo "  make setup-hooks  - Install pre-commit security hooks"
@@ -34,7 +39,7 @@ setup:
 	uv sync
 
 test:
-	uv run pytest
+	PYTHONPATH=. uv run pytest
 
 install:
 	uv sync
@@ -43,16 +48,44 @@ setup-hooks:
 	uv run pre-commit install
 
 generate-tools:
-	PYTHONPATH=. uv run python -c "from agent_loader import agent_loader; agent_loader.generate_tools_md()"
+	PYTHONPATH=. uv run python -c "from infra.agent_loader import agent_loader; agent_loader.generate_tools_md()"
 
 run:
-	uv run uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload
+	PYTHONPATH=. uv run uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload
 
 cli:
-	uv run python cli.py
+	PYTHONPATH=. uv run python entrypoints/cli.py
+
+bot:
+	PYTHONPATH=. uv run python entrypoints/bot.py
+
+bot-start:
+	@if [ -f $(BOT_PID) ]; then \
+		echo "Bot is already running (PID: $$(cat $(BOT_PID)))"; \
+	else \
+		PYTHONPATH=. uv run python entrypoints/bot.py > bot.log 2>&1 & echo $$! > $(BOT_PID); \
+		echo "Bot started in background (PID: $$(cat $(BOT_PID)))"; \
+	fi
+
+bot-stop:
+	@if [ -f $(BOT_PID) ]; then \
+		PID=$$(cat $(BOT_PID)); \
+		echo "Stopping Bot (PID: $$PID)..."; \
+		kill $$PID && rm $(BOT_PID) || (echo "Process not found. Cleaning up PID file." && rm $(BOT_PID)); \
+	else \
+		echo "Bot is not running."; \
+	fi
+
+bot-status:
+	@if [ -f $(BOT_PID) ]; then \
+		echo "Bot is running (PID: $$(cat $(BOT_PID)))"; \
+		ps -p $$(cat $(BOT_PID)); \
+	else \
+		echo "Bot is not running."; \
+	fi
 
 yolo:
-	uv run python cli.py --yolo
+	PYTHONPATH=. uv run python entrypoints/cli.py --yolo
 
 clear-memory:
 	@echo "Wiping all session data and long-term memory..."
@@ -67,7 +100,7 @@ start:
 	@if [ -f $(PID_FILE) ]; then \
 		echo "API is already running (PID: $$(cat $(PID_FILE)))"; \
 	else \
-		uv run uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) > api.log 2>&1 & echo $$! > $(PID_FILE); \
+		PYTHONPATH=. uv run uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) > api.log 2>&1 & echo $$! > $(PID_FILE); \
 		echo "API started in background (PID: $$(cat $(PID_FILE)))"; \
 	fi
 
@@ -93,6 +126,6 @@ status:
 clean:
 	rm -rf .venv
 	rm -rf sessions
-	rm -f .api.pid
-	rm -f api.log
+	rm -f .api.pid .bot.pid
+	rm -f api.log bot.log
 	find . -type d -name "__pycache__" -exec rm -rf {} +

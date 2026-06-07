@@ -1,5 +1,5 @@
 import pytest
-from persistence import SessionLogger
+from infra.persistence import SessionLogger
 from langchain_core.messages import HumanMessage
 
 @pytest.mark.asyncio
@@ -19,8 +19,5 @@ async def test_fts5_injection_safety():
     logger.log_messages([HumanMessage(content="Normal message")])
 
     # 3. Test for potential injection/logic escape
-    # This should search for the literal string and return nothing (or just match the content safely)
     results = logger.search_messages('Normal" OR "1"="1')
-    # With my fix, this becomes "Normal"" OR ""1""=""1" which is a single phrase.
-    # It shouldn't return all messages.
     assert len(results) == 0

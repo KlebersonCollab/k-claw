@@ -9,10 +9,10 @@ from rich.prompt import Prompt, Confirm
 from rich.table import Table
 from rich.markup import escape
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from harness import harness
-from persistence import SessionLogger
+from core.harness import harness
+from infra.persistence import SessionLogger
 from dotenv import load_dotenv
-from ui_interface import UIInterface, EventType, set_ui
+from core.ui_interface import UIInterface, EventType, set_ui
 
 load_dotenv()
 console = Console()
@@ -89,7 +89,7 @@ async def run_cli():
     is_new_session = (len(initial_messages) == 0)
 
     harness_metadata = {
-        "context_budget": 50, "max_iterations": 25, "iteration_count": 0,
+        "context_budget": 50, "max_iterations": 50, "iteration_count": 0,
         "session_id": session_id,
         "permissions": os.getenv("HARNESS_PERMISSIONS", "execute"),
         "context_summary": "", "incognito": False, "yolo": args.yolo

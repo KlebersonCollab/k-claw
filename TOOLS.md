@@ -14,6 +14,48 @@ Use esta ferramenta para terceirizar tarefas complexas para especialistas.
 - **ESPECIALISTAS:** Use `coder` para código e `researcher` para análises.
 
 ---
+### Tool: glob_search
+
+Detailed Instructions:
+# Tool: glob_search
+
+Localiza arquivos no projeto usando padrões de busca (wildcards).
+
+### Quando usar:
+- Para encontrar arquivos por extensão (ex: todos os `.py`).
+- Para listar arquivos em subdiretórios profundos sem usar múltiplos `list_directory`.
+- Para verificar a existência de arquivos específicos seguindo um padrão de nome.
+
+### Argumentos:
+- `pattern` (string, obrigatório): O padrão glob (ex: "**/*.md", "tests/test_*.py").
+- `path` (string, opcional): Diretório base para a busca. Default: ".".
+
+### Retorno:
+Lista de caminhos de arquivos que deram match com o padrão, respeitando as regras de ignore do projeto.
+
+---
+### Tool: grep_search
+
+Detailed Instructions:
+# Tool: grep_search
+
+Busca cirúrgica por padrões de texto ou regex dentro do conteúdo dos arquivos do projeto.
+
+### Quando usar:
+- Para encontrar onde uma função ou variável está definida.
+- Para localizar mensagens de erro específicas no código.
+- Para analisar trechos de código sem ler o arquivo inteiro (economiza tokens).
+
+### Argumentos:
+- `pattern` (string, obrigatório): O padrão regex ou texto a buscar.
+- `path` (string, opcional): Diretório ou arquivo onde iniciar a busca. Default: ".".
+- `include_pattern` (string, opcional): Padrão glob para filtrar arquivos (ex: "*.py", "core/*.md").
+- `context` (inteiro, opcional): Número de linhas de contexto antes e depois do match.
+
+### Retorno:
+Lista de matches formatada com o nome do arquivo, número da linha e o bloco de contexto.
+
+---
 ### Tool: list_directory
 Description: Lists files and folders, respecting project ignore rules.
 Usage: list_directory(path='.')

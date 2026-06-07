@@ -5,7 +5,7 @@ import os
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from persistence_db import SessionLocal, SessionModel, MessageModel, EventModel, MemoryModel, init_db, engine
+from infra.persistence_db import SessionLocal, SessionModel, MessageModel, EventModel, MemoryModel, init_db, engine
 from sqlalchemy import text, func
 
 init_db()

@@ -1,7 +1,10 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from state import HarnessState
-from logic import call_model, should_continue, execute_tools, compact_context
+from .state import HarnessState
+from .model_caller import call_model
+from .dialog_control import should_continue
+from .tool_executor import execute_tools
+from .compaction import compact_context
 
 # Initialize memory saver for persistence
 checkpointer = MemorySaver()

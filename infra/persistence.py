@@ -2,7 +2,7 @@ import json
 from typing import Any, Dict, List, Optional
 import os
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
-from persistence_db import SessionLocal, SessionModel, MessageModel, EventModel, MemoryModel, init_db, engine
+from .persistence_db import SessionLocal, SessionModel, MessageModel, EventModel, MemoryModel, init_db, engine
 
 # Lazy load embeddings to save latency
 _EMBEDDINGS_MODEL = None
@@ -137,7 +137,7 @@ class SessionLogger:
             return {"content": memory.content, "summary": memory.summary, "session_id": memory.session_id} if memory else None
 
     def delete_memory_by_session(self, target_session_id: str):
-        from persistence_db import MemoryModel, MessageModel, EventModel
+        from .persistence_db import MemoryModel, MessageModel, EventModel
         with SessionLocal() as db:
             db.query(MemoryModel).filter(MemoryModel.session_id == target_session_id).delete()
             db.query(MessageModel).filter(MessageModel.session_id == target_session_id).delete()
@@ -146,7 +146,7 @@ class SessionLogger:
 
     @staticmethod
     def list_sessions() -> List[Dict[str, Any]]:
-        from persistence_db import SessionModel, SessionLocal, init_db
+        from .persistence_db import SessionModel, SessionLocal, init_db
         init_db()
         with SessionLocal() as db:
             sessions = db.query(SessionModel).order_by(SessionModel.created_at.desc()).all()

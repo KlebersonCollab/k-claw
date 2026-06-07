@@ -18,6 +18,7 @@ from typing import Dict, Optional
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -196,7 +197,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "No active session yet. Send any message to start, or use /new.\n\n"
             "Commands: /new /yolo /status"
         )
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    await safe_reply(update, msg, parse_mode="Markdown")
 
 
 async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -205,7 +206,8 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_sessions[chat_id] = session_id
     save_chat_sessions(chat_sessions)
     yolo_modes[chat_id] = False
-    await update.message.reply_text(
+    await safe_reply(
+        update,
         f"🆕 New session started!\nSession ID: `{session_id}`",
         parse_mode="Markdown",
     )
@@ -217,7 +219,8 @@ async def cmd_yolo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     yolo_modes[chat_id] = not current
     new_state = yolo_modes[chat_id]
     emoji = "🔴" if new_state else "🟢"
-    await update.message.reply_text(
+    await safe_reply(
+        update,
         f"{emoji} YOLO mode: *{'ON' if new_state else 'OFF'}*",
         parse_mode="Markdown",
     )
@@ -234,7 +237,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     slog = SessionLogger(session_id)
     history = slog.get_message_history()
-    await update.message.reply_text(
+    await safe_reply(
+        update,
         (
             f"📊 *Session Status*\n\n"
             f"Session ID: `{session_id}`\n"
@@ -243,6 +247,27 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ),
         parse_mode="Markdown",
     )
+
+
+async def safe_reply(update: Update, text: str, parse_mode: str = "Markdown", **kwargs):
+    """Tenta enviar mensagem com formatação, fallback para texto simples se falhar."""
+    try:
+        if update.message:
+            return await update.message.reply_text(text, parse_mode=parse_mode, **kwargs)
+        elif update.callback_query and update.callback_query.message:
+            return await update.callback_query.message.reply_text(
+                text, parse_mode=parse_mode, **kwargs
+            )
+    except BadRequest as e:
+        if "Can't parse entities" in str(e):
+            # Fallback para texto simples se o Markdown estiver quebrado
+            if update.message:
+                return await update.message.reply_text(text, parse_mode=None, **kwargs)
+            elif update.callback_query and update.callback_query.message:
+                return await update.callback_query.message.reply_text(
+                    text, parse_mode=None, **kwargs
+                )
+        raise e
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -297,20 +322,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Telegram tem limite de 4096 chars por mensagem
         if len(response_text) <= MAX_TELEGRAM_MSG:
-            await update.message.reply_text(
-                response_text, parse_mode="Markdown"
-            )
+            await safe_reply(update, response_text, parse_mode="Markdown")
         else:
             # Enviar em partes
             for i in range(0, len(response_text), MAX_TELEGRAM_MSG):
                 chunk = response_text[i : i + MAX_TELEGRAM_MSG]
-                await update.message.reply_text(chunk, parse_mode="Markdown")
+                await safe_reply(update, chunk, parse_mode="Markdown")
 
     except Exception as exc:
         logger.exception("Harness error for chat %s", chat_id)
-        await update.message.reply_text(
-            f"❌ *Error:* {truncate(str(exc), 500)}",
-            parse_mode="Markdown",
+        await safe_reply(
+            update, f"❌ *Error:* {truncate(str(exc), 500)}", parse_mode="Markdown"
         )
 
 

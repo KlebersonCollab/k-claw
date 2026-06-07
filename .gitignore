@@ -26,3 +26,5 @@ system.log
 # Other files
 .api.pid
 api.log
+
+telegram_sessions.json

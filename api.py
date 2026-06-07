@@ -53,11 +53,14 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
+    if len(request.message) > 10000:
+        raise HTTPException(status_code=400, detail="Message too long (max 10000 characters)")
+
     session_id = request.session_id or str(uuid.uuid4())
 
     # 1. Setup API Interface
     api_ui = APIInterface(session_id)
-    set_ui(api_ui) # Note: Global singleton pattern might need thread-local for true multi-user API
+    set_ui(api_ui)
 
     # 2. Get history from DB
     logger = SessionLogger(session_id)

@@ -1,3 +1,4 @@
+import contextvars
 from enum import Enum
 from typing import Any, Dict, Optional, Callable, Awaitable
 
@@ -21,11 +22,18 @@ class UIInterface:
         return False
 
 # Context-based singleton to avoid passing UI everywhere
-_CURRENT_UI: Optional[UIInterface] = None
+# Using ContextVar for thread-safety in async/multi-user environments
+_UI_VAR: contextvars.ContextVar[Optional[UIInterface]] = contextvars.ContextVar("current_ui", default=None)
+_SESSION_ID_VAR: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("current_session_id", default=None)
 
 def set_ui(ui: UIInterface):
-    global _CURRENT_UI
-    _CURRENT_UI = ui
+    _UI_VAR.set(ui)
 
 def get_ui() -> Optional[UIInterface]:
-    return _CURRENT_UI
+    return _UI_VAR.get()
+
+def set_current_session_id(session_id: str):
+    _SESSION_ID_VAR.set(session_id)
+
+def get_current_session_id() -> Optional[str]:
+    return _SESSION_ID_VAR.get()

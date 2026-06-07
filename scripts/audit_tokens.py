@@ -1,11 +1,20 @@
 import json
 import sqlite3
+import sys
+import os
 from collections import Counter
 
-DB_PATH = "harness.db"
-TARGET_SESSION = "019e9b66-230e-7ae2-b5b3-d7e2c113afd6"
+# Add project root to sys.path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PROJECT_ROOT)
+
+DB_PATH = os.path.join(PROJECT_ROOT, "harness.db")
 
 def analyze_token_usage(session_id):
+    if not session_id:
+        print("Error: No session_id provided.")
+        return
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -68,4 +77,8 @@ def analyze_token_usage(session_id):
     conn.close()
 
 if __name__ == "__main__":
-    analyze_token_usage(TARGET_SESSION)
+    target = sys.argv[1] if len(sys.argv) > 1 else None
+    if not target:
+        print("Usage: python scripts/audit_tokens.py <session_id>")
+        sys.exit(1)
+    analyze_token_usage(target)

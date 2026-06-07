@@ -21,7 +21,8 @@ harness.db-journal
 # Logs
 harness.log
 harness.log.*
-
+system.log
+*.log
 # Other files
 .api.pid
 api.log

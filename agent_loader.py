@@ -48,7 +48,9 @@ class AgentDefinitionLoader:
                         name = file.replace(".md", "")
                         data = self.load_agent(name)
                         agents.append({"id": name, "name": data.get("name", name), "description": data.get("description", "")})
-                    except: continue
+                    except Exception as e:
+                        print(f"Error loading agent {file}: {e}")
+                        continue
         return agents
 
     def generate_tools_md(self):

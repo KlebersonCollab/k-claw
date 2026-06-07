@@ -1,7 +1,7 @@
 [project]
 name = "agent-harness"
 version = "0.1.0"
-description = "Add your description here"
+description = "Framework de orquestração multi-agente com memória em camadas e busca híbrida."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -14,7 +14,6 @@ dependencies = [
     "langchain-openrouter>=0.2.3",
     "langgraph>=1.2.4",
     "langsmith>=0.8.9",
-    "pre-commit>=4.6.0",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
@@ -29,4 +28,5 @@ dependencies = [
 dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
+    "pre-commit>=4.6.0",
 ]

@@ -6,11 +6,12 @@ HOST = 0.0.0.0
 PORT = 8000
 PID_FILE = .api.pid
 
-.PHONY: install run start stop restart clean status help cli clear-memory logs setup-hooks generate-tools yolo
+.PHONY: install run start stop restart clean status help cli clear-memory logs setup-hooks generate-tools yolo setup test
 
 help:
 	@echo "Available commands:"
 	@echo "  make install      - Install dependencies using uv"
+	@echo "  make setup        - Initial project setup (copy .env, install deps)"
 	@echo "  make run          - Run the API in foreground (development)"
 	@echo "  make start        - Start the API in background"
 	@echo "  make stop         - Stop the background API process"
@@ -23,6 +24,17 @@ help:
 	@echo "  make setup-hooks  - Install pre-commit security hooks"
 	@echo "  make generate-tools - Consolidate tool manuals into TOOLS.md"
 	@echo "  make logs         - Show API logs"
+	@echo "  make test         - Run tests using pytest"
+
+setup:
+	@if [ ! -f .env ]; then \
+		echo "Copying .env.template to .env..."; \
+		cp .env.template .env; \
+	fi
+	uv sync
+
+test:
+	uv run pytest
 
 install:
 	uv sync

@@ -245,6 +245,9 @@ def forget_session(session_id_to_forget: str) -> str:
 async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = False) -> str:
     """Delegates a task to a specialist sub-agent (coder, researcher)."""
     from agent_loader import agent_loader
+    from ui_interface import get_current_session_id
+    current_session = get_current_session_id() or "unknown"
+
     global _HARNESS_REF
     if _HARNESS_REF is None: return "Error: Harness not initialized."
     try:
@@ -263,12 +266,17 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
             for t_name in allowed_tools:
                 tools_manual += agent_loader.load_tool_manual(t_name)
 
+        # Traceable session ID: sub-{parent_prefix}-{agent_id}-{timestamp}
+        import time
+        ts = int(time.time()) % 10000
+        sub_session_id = f"sub-{current_session[:8]}-{agent_id}-{ts}"
+
         sub_state = {
             "messages": [SystemMessage(content=f"{specialist_prompt}\n{briefing}{tools_manual}{skills_content}"), HumanMessage(content=mission)],
             "context_budget": 50,
             "max_iterations": config.get("max_iterations", 10),
             "iteration_count": 0,
-            "session_id": f"sub-{agent_id}-{os.urandom(4).hex()}",
+            "session_id": sub_session_id,
             "permissions": specialist_permissions, "context_summary": "",
             "incognito": False, "yolo": parent_yolo
         }

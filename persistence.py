@@ -91,7 +91,12 @@ class SessionLogger:
     def search_messages(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
         from sqlalchemy import text
         with SessionLocal() as db:
-            clean_q = query.replace('"', ' ')
+            # Escape double quotes by doubling them for FTS5 phrase search
+            # and wrap the whole query in double quotes to treat it as a single phrase.
+            # This prevents interpretation of FTS5 operators like OR, AND, NEAR.
+            clean_q = query.replace('"', '""').strip()
+            if not clean_q:
+                return []
             sanitized_query = f'"{clean_q}"'
             sql = text("SELECT content, session_id, role, content_rowid FROM messages_fts WHERE messages_fts MATCH :q LIMIT :limit")
             results = db.execute(sql, {"q": sanitized_query, "limit": limit}).fetchall()

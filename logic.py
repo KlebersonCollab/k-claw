@@ -9,7 +9,7 @@ from persistence import SessionLogger
 from dotenv import load_dotenv
 from agent_loader import agent_loader
 from utils import get_model, redact_sensitive_info, recursive_load_context, estimate_tokens, cap_tool_output
-from ui_interface import get_ui, EventType
+from ui_interface import get_ui, EventType, set_current_session_id
 from hooks import hook_manager
 
 load_dotenv()
@@ -160,11 +160,12 @@ async def compact_context(state: HarnessState):
 
     await emit_event(EventType.COMPACTION_END, {"memo": state_memo})
     return {
-        "messages": state["messages"][-4:],
+        "messages": state["messages"][-10:],
         "context_summary": state_memo
     }
 
 async def execute_tools(state: HarnessState):
+    set_current_session_id(state['session_id'])
     scratchpad = state.get("scratchpad", [])
     last_message = scratchpad[-1]
     tool_messages = []

@@ -44,6 +44,19 @@ path_filter = PathFilter()
 # Global cache for the model instance
 _MODEL_CACHE = {}
 
+import logging
+
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.FileHandler("system.log"),
+        logging.StreamHandler(sys.stdout) if os.getenv("DEBUG") else logging.NullHandler()
+    ]
+)
+logger = logging.getLogger("agent-harness")
+
 def get_model():
     provider = os.getenv("AI_PROVIDER", "openai")
     model_name = os.getenv("AI_MODEL", "gpt-4o")
@@ -67,7 +80,10 @@ def redact_sensitive_info(text: str) -> str:
     patterns = [
         r"(sk-[a-zA-Z0-9]{32,})", # OpenAI/Anthropic
         r"(AIza[0-9A-Za-z-_]{35})", # Google
-        r"([a-f0-9]{32})", # Generic hex
+        r"(hf_[a-zA-Z0-9]{34})", # HuggingFace
+        r"(gh[oprs]_[a-zA-Z0-9]{36,})", # GitHub
+        r"(AKIA[0-9A-Z]{16})", # AWS Access Key
+        r"([a-f0-9]{32})", # Generic hex (MD5/etc)
     ]
     redacted = text
     for pattern in patterns:

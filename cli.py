@@ -101,6 +101,10 @@ async def run_cli():
         user_input = Prompt.ask("[bold yellow]You[/bold yellow]")
         if user_input.lower() in ["exit", "quit"]: break
 
+        if len(user_input) > 10000:
+            console.print("[bold red]Error:[/bold red] Message too long (max 10000 characters).")
+            continue
+
         if is_new_session:
             current_input = {**harness_metadata, "messages": [HumanMessage(content=user_input)]}
             is_new_session = False

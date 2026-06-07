@@ -1,13 +1,28 @@
 import json
+import sys
+import os
+
+# Add project root to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from persistence_db import SessionLocal, SessionModel, MessageModel, EventModel, MemoryModel, init_db, engine
 from sqlalchemy import text, func
 
 init_db()
 
-TARGET_SESSION = "019e9b66-230e-7ae2-b5b3-d7e2c113afd6"
+if len(sys.argv) > 1:
+    TARGET_SESSION = sys.argv[1]
+else:
+    print("Usage: python scripts/analyze_session.py <session_id>")
+    print("Listing available sessions:")
+    with SessionLocal() as db:
+        sessions = db.query(SessionModel).all()
+        for s in sessions:
+            print(f"  {s.id} ({s.created_at})")
+    sys.exit(1)
 
 print("=" * 80)
-print("1. ALL SESSIONS IN DB")
+print(f"ANALYZING SESSION: {TARGET_SESSION}")
 print("=" * 80)
 with SessionLocal() as db:
     sessions = db.query(SessionModel).all()

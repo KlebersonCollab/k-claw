@@ -1,22 +1,26 @@
-import asyncio
+import pytest
 from persistence import SessionLogger
 from langchain_core.messages import HumanMessage
 
-async def verify_fts5_sanitization():
+@pytest.mark.asyncio
+async def test_fts5_sanitization():
     logger = SessionLogger("test-fts5-dots")
     # 1. Log a message with a filename
     logger.log_messages([HumanMessage(content="Analyzing the AGENTS.md file.")])
 
-    # 2. Search for the filename (this used to crash)
-    print("Testing search for 'AGENTS.md'...")
-    try:
-        results = logger.search_messages("AGENTS.md")
-        print(f"Results: {results}")
-        assert len(results) > 0
-        print("✅ FTS5 Sanitization Validated!")
-    except Exception as e:
-        print(f"❌ FTS5 Sanitization Failed: {str(e)}")
-        raise e
+    # 2. Search for the filename (this used to crash with dots if not quoted)
+    results = logger.search_messages("AGENTS.md")
+    assert len(results) > 0
+    assert "AGENTS.md" in results[0]["content"]
 
-if __name__ == "__main__":
-    asyncio.run(verify_fts5_sanitization())
+@pytest.mark.asyncio
+async def test_fts5_injection_safety():
+    logger = SessionLogger("test-fts5-injection")
+    logger.log_messages([HumanMessage(content="Normal message")])
+
+    # 3. Test for potential injection/logic escape
+    # This should search for the literal string and return nothing (or just match the content safely)
+    results = logger.search_messages('Normal" OR "1"="1')
+    # With my fix, this becomes "Normal"" OR ""1""=""1" which is a single phrase.
+    # It shouldn't return all messages.
+    assert len(results) == 0

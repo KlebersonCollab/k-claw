@@ -3,10 +3,17 @@
 
 import sqlite3
 import os
+import sys
 
-DB_PATH = "/home/kleberson/Documentos/test/harness.db"
-OUTPUT_PATH = "/home/kleberson/Documentos/test/query_results.txt"
-SESSION_ID = "019e9b66-230e-7ae2-b5b3-d7e2c113afd6"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, "harness.db")
+OUTPUT_PATH = os.path.join(PROJECT_ROOT, "query_results.txt")
+
+if len(sys.argv) > 1:
+    SESSION_ID = sys.argv[1]
+else:
+    print("Usage: python scripts/run_queries.py <session_id>")
+    sys.exit(1)
 
 lines = []
 

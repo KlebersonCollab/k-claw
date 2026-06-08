@@ -403,13 +403,13 @@ def main():
     app = Application.builder().token(token).build()
 
     # Handlers
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("new", cmd_new))
-    app.add_handler(CommandHandler("yolo", cmd_yolo))
-    app.add_handler(CommandHandler("status", cmd_status))
-    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(CommandHandler("start", cmd_start, block=False))
+    app.add_handler(CommandHandler("new", cmd_new, block=False))
+    app.add_handler(CommandHandler("yolo", cmd_yolo, block=False))
+    app.add_handler(CommandHandler("status", cmd_status, block=False))
+    app.add_handler(CallbackQueryHandler(handle_callback, block=False))
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False)
     )
 
     logger.info("🤖 Telegram Bot starting…")

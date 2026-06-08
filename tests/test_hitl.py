@@ -4,13 +4,16 @@ from core.harness import harness
 from unittest.mock import patch, AsyncMock, MagicMock
 
 @pytest.mark.asyncio
-async def test_hitl_interrupt():
+async def test_hitl_approval_called():
     session_id = "test-hitl-session"
     config = {"configurable": {"thread_id": session_id}}
 
-    # Mock get_model to force a tool call response
+    # 1. Mock UI and Model
+    mock_ui = MagicMock()
+    mock_ui.request_approval = AsyncMock(return_value=True)
+    mock_ui.on_event = AsyncMock() # Must be AsyncMock
+
     mock_model = MagicMock()
-    # Mock a response that triggers 'write_file'
     mock_response = AIMessage(
         content="",
         tool_calls=[{
@@ -22,25 +25,30 @@ async def test_hitl_interrupt():
     mock_model.ainvoke = AsyncMock(return_value=mock_response)
     mock_model.bind_tools.return_value = mock_model
 
+    # 2. Patch components
+    from core.ui_interface import set_ui
+    set_ui(mock_ui)
+
     with patch('core.model_caller.get_model', return_value=mock_model):
-        # 1. Setup state
-        state = {
-            "messages": [HumanMessage(content="Escreva 'Olá' no arquivo test.txt")],
-            "context_budget": 10,
-            "max_iterations": 5,
-            "iteration_count": 0,
-            "session_id": session_id,
-            "permissions": "write",
-            "context_summary": "",
-            "incognito": False,
-            "yolo": False
-        }
+        with patch('core.tool_executor.SessionLogger'):
+            # 3. Setup state
+            state = {
+                "messages": [HumanMessage(content="Escreva 'Olá' no arquivo test.txt")],
+                "context_budget": 10,
+                "max_iterations": 5,
+                "iteration_count": 0,
+                "session_id": session_id,
+                "permissions": "write",
+                "context_summary": "",
+                "incognito": True,
+                "yolo": False
+            }
 
-        # Invoke. LangGraph should interrupt because write_file requires approval
-        # and we are NOT in YOLO mode.
-        await harness.ainvoke(state, config=config)
+            # 4. Invoke
+            await harness.ainvoke(state, config=config)
 
-        # Check if we are at an interrupt
-        snapshot = harness.get_state(config)
-        # In the actual graph, it should pause BEFORE executing tools
-        assert "tools" in snapshot.next
+            # 5. Verify request_approval was called
+            assert mock_ui.request_approval.called
+            args = mock_ui.request_approval.call_args[0]
+            assert args[0] == "write_file"
+            assert args[1]["path"] == "test.txt"

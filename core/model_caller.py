@@ -1,13 +1,19 @@
 """Model invocation - handles calling the LLM with tools and processing responses."""
 
+import asyncio
+from typing import Dict, Optional
+
 from langchain_core.messages import AIMessage
-from .state import HarnessState
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from tools import registry
+
 from .model_config import get_model
+from .prompt_builder import get_cached_system_prompt
+from .state import HarnessState
+from .ui_interface import EventType, get_ui, set_current_session_id
 from .utils import redact_sensitive_info
 from infra.persistence import SessionLogger
-from .ui_interface import get_ui, EventType, set_current_session_id
-from .prompt_builder import get_cached_system_prompt
 
 
 async def emit_event(event_type: EventType, data: dict = None) -> None:
@@ -44,7 +50,24 @@ async def call_model(state: HarnessState) -> dict:
 
     authorized_tools = registry.get_langchain_tools(state["permissions"])
     model_with_tools = model.bind_tools(authorized_tools)
-    response = await model_with_tools.ainvoke(messages_for_llm)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((ValueError, Exception)), # Retrying on general exceptions as well for robustness
+        reraise=True
+    )
+    async def _invoke_with_retry():
+        try:
+            return await model_with_tools.ainvoke(messages_for_llm)
+        except ValueError as e:
+            # specifically check for 502/503/504 style errors from provider
+            err_msg = str(e)
+            if "502" in err_msg or "503" in err_msg or "504" in err_msg or "Provider returned error" in err_msg:
+                raise e # retry
+            raise e # reraise if not a transient error (though tenacity will retry based on type)
+
+    response = await _invoke_with_retry()
 
     await emit_event(EventType.THINKING_END, {"agent": agent_name})
 

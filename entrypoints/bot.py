@@ -35,6 +35,23 @@ from infra.persistence import SessionLogger
 load_dotenv()
 
 # ──────────────────────────────────────────────
+# Security: Telegram User Authorization
+# ──────────────────────────────────────────────
+ALLOWED_USERS_STR = os.getenv("ALLOWED_TELEGRAM_USERS", "")
+ALLOWED_USER_IDS = [int(u.strip()) for u in ALLOWED_USERS_STR.split(",") if u.strip()]
+
+async def check_auth(update: Update) -> bool:
+    """Verifies if the user is authorized to use the bot."""
+    if not update.effective_user:
+        return False
+    user_id = update.effective_user.id
+    if ALLOWED_USER_IDS and user_id not in ALLOWED_USER_IDS:
+        logger.warning(f"Unauthorized access attempt from user ID: {user_id}")
+        await safe_reply(update, "⛔ *Access Denied:* You are not authorized to use this bot.")
+        return False
+    return True
+
+# ──────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────
 logging.basicConfig(
@@ -176,6 +193,7 @@ class TelegramInterface(UIInterface):
 # Bot command handlers
 # ──────────────────────────────────────────────
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_auth(update): return
     chat_id = str(update.effective_chat.id)
     session_id = chat_sessions.get(chat_id)
     yolo = yolo_modes.get(chat_id, False)
@@ -201,6 +219,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_auth(update): return
     chat_id = str(update.effective_chat.id)
     session_id = str(uuid.uuid4())
     chat_sessions[chat_id] = session_id
@@ -214,6 +233,7 @@ async def cmd_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_yolo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_auth(update): return
     chat_id = str(update.effective_chat.id)
     current = yolo_modes.get(chat_id, False)
     yolo_modes[chat_id] = not current
@@ -227,6 +247,7 @@ async def cmd_yolo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_auth(update): return
     chat_id = str(update.effective_chat.id)
     session_id = chat_sessions.get(chat_id)
     yolo = yolo_modes.get(chat_id, False)
@@ -271,6 +292,7 @@ async def safe_reply(update: Update, text: str, parse_mode: str = "Markdown", **
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_auth(update): return
     chat_id = str(update.effective_chat.id)
     text = update.message.text or ""
 
@@ -338,6 +360,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Resolve aprovações pendentes via botões inline."""
+    if not await check_auth(update): return
     query = update.callback_query
     await query.answer()
 

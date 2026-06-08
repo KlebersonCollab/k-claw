@@ -45,6 +45,14 @@ class MemoryModel(Base):
     vector = Column(Text) # JSON string of the embedding
     created_at = Column(DateTime, default=datetime.utcnow)
 
+def setup_engine_events(target_engine):
+    """Attach required SQLite extension loading events to an engine."""
+    @event.listens_for(target_engine, "connect")
+    def load_sqlite_extensions(dbapi_connection, connection_record):
+        dbapi_connection.enable_load_extension(True)
+        sqlite_vec.load(dbapi_connection)
+        dbapi_connection.enable_load_extension(False)
+
 # Database setup
 DB_URL = "sqlite:///harness.db"
 # Set connect_args for timeout and check_same_thread (important for FastAPI/Uvicorn)
@@ -52,12 +60,7 @@ engine = create_engine(
     DB_URL,
     connect_args={"check_same_thread": False, "timeout": 30}
 )
-
-@event.listens_for(engine, "connect")
-def load_sqlite_extensions(dbapi_connection, connection_record):
-    dbapi_connection.enable_load_extension(True)
-    sqlite_vec.load(dbapi_connection)
-    dbapi_connection.enable_load_extension(False)
+setup_engine_events(engine)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

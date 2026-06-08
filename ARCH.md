@@ -248,7 +248,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph "Agente Pai (Orquestrador)"
-        ORCH["Orchestrator (OWL)<br/><br/>Regras rígidas:<br/>1. NUNCA executa tarefas diretamente<br/>2. DELEGA para especialistas<br/>3. Revisa relatórios dos especialistas<br/>4. Relata conclusão ao usuário<br/><br/>Prompt inclui:<br/>• Catálogo de especialistas<br/>• AGENTS.md / CONTEXT.md<br/>• State Memo (se compactado)"]
+        ORCH["Orchestrator (K-Claw)<br/><br/>Regras rígidas:<br/>1. NUNCA executa tarefas diretamente<br/>2. DELEGA para especialistas<br/>3. Revisa relatórios dos especialistas<br/>4. Relata conclusão ao usuário<br/><br/>Prompt inclui:<br/>• Catálogo de especialistas<br/>• AGENTS.md / CONTEXT.md<br/>• State Memo (se compactado)"]
     end
 
     subgraph "agent_loader.py — Carregamento Dinâmico"

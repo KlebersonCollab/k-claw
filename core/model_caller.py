@@ -52,7 +52,7 @@ async def call_model(state: HarnessState) -> dict:
     model_with_tools = model.bind_tools(authorized_tools)
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception_type((ValueError, Exception)), # Retrying on general exceptions as well for robustness
         reraise=True

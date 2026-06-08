@@ -2,7 +2,7 @@
 
 > **Data:** 2025-07-16
 > **Versão Analisada:** 0.1.0
-> **Avaliador:** OWL — Engenheiro de Software Sênior
+> **Avaliador:** K-Claw — Engenheiro de Software Sênior
 > **Escopo:** Todos os módulos-fonte (12 arquivos `.py`), arquivos de configuração, testes e scripts auxiliares.
 
 ---
@@ -403,4 +403,4 @@ Entretanto, **lacunas significativas** impedem uma nota mais alta:
 
 ---
 
-*Relatório gerado por OWL — Análise técnica imparcial e acionável.*
+*Relatório gerado por K-Claw — Análise técnica imparcial e acionável.*

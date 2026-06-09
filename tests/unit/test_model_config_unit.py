@@ -51,6 +51,16 @@ class TestGetModel:
                 assert call_kwargs["base_url"] == "https://openrouter.ai/api/v1"
                 assert call_kwargs["api_key"] == "test-key"
 
+    def test_ollama_sets_base_url(self):
+        _MODEL_CACHE.clear()
+        with patch("core.model_config.init_chat_model") as mock_init:
+            mock_init.return_value = MagicMock()
+            with patch.dict(os.environ, {"AI_PROVIDER": "ollama", "AI_MODEL": "llama3", "OLLAMA_BASE_URL": "http://test-ollama:11434"}):
+                get_model()
+                call_kwargs = mock_init.call_args[1]
+                assert call_kwargs["base_url"] == "http://test-ollama:11434"
+                assert call_kwargs["model_provider"] == "ollama"
+
     def test_default_values(self):
         _MODEL_CACHE.clear()
         with patch("core.model_config.init_chat_model") as mock_init:

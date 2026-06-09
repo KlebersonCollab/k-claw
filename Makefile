@@ -39,7 +39,7 @@ setup:
 	uv sync
 
 test:
-	PYTHONPATH=. uv run pytest
+	PYTHONPATH=. uv run python -m pytest
 
 install:
 	uv sync

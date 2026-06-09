@@ -33,7 +33,7 @@ Projetado para ser **extensível**, **seguro** e **observável**, o framework pe
 | 🔒 **Redação de Segredos** | Chaves de API e secrets são automaticamente mascarados via regex |
 | 📦 **Compactação de Contexto** | Geração automática de "State Memo" quando o orçamento de contexto é excedido |
 | 📂 **Carregamento Dinâmico** | Sub-agentes definidos em `.md` com YAML frontmatter; skills injetados na delegação |
-| 🔁 **Multi-Provider LLM** | Suporte para OpenAI, Anthropic (Claude), Google e OpenRouter |
+| 🔁 **Multi-Provider LLM** | Suporte para OpenAI, Anthropic (Claude), Google, OpenRouter e Ollama (local) |
 | 🖥️ **CLI Interativa** | REPL com Rich (tabelas, cores, prompts, status) + opção de retomar sessões |
 | 🌐 **REST API** | Endpoints FastAPI: `/chat`, `/approve`, `/stream`, `/status`, `/health` |
 | 📱 **Telegram Bot** | Integração completa com Telegram, incluindo autorização por user ID |
@@ -46,7 +46,7 @@ Projetado para ser **extensível**, **seguro** e **observável**, o framework pe
 |---|---|
 | **Linguagem** | Python 3.13+ |
 | **Orquestração** | LangGraph (StateGraph) |
-| **LLM** | LangChain + OpenAI / Anthropic / Google / OpenRouter |
+| **LLM** | LangChain + OpenAI / Anthropic / Google / OpenRouter / Ollama |
 | **API** | FastAPI + Uvicorn |
 | **Persistência** | SQLAlchemy + SQLite (WAL mode, FTS5, sqlite-vec) |
 | **Embeddings** | HuggingFace (all-MiniLM-L6-v2, 384 dims) |
@@ -100,12 +100,13 @@ Copie o template `.env.template` para `.env` e configure:
 
 | Variável | Default | Obrigatório | Descrição |
 |---|---|---|---|
-| `AI_PROVIDER` | `openrouter` | ✅ | Provider do LLM: `openai`, `anthropic`, `google`, `openrouter` |
+| `AI_PROVIDER` | `openrouter` | ✅ | Provider do LLM: `openai`, `anthropic`, `google`, `openrouter`, `ollama` |
 | `AI_MODEL` | `anthropic/claude-3.5-sonnet` | ✅ | Nome/identificador do modelo |
 | `OPENAI_API_KEY` | — | Condicional | API key da OpenAI (se provider=openai) |
 | `ANTHROPIC_API_KEY` | — | Condicional | API key da Anthropic (se provider=anthropic) |
 | `OPENROUTER_API_KEY` | — | Condicional | API key do OpenRouter (se provider=openrouter) |
 | `GOOGLE_API_KEY` | — | Condicional | API key do Google (se provider=google) |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | ❌ | URL do servidor Ollama |
 | `HARNESS_PERMISSIONS` | `execute` | ❌ | Permissão padrão: `read`, `write` ou `execute` |
 | `LANGSMITH_TRACING` | — | ❌ | Ativa tracing LangSmith: `true` ou `false` |
 | `LANGSMITH_ENDPOINT` | — | ❌ | Endpoint da API LangSmith |

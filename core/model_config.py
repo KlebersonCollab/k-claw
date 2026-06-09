@@ -17,6 +17,7 @@ def get_model():
         AI_PROVIDER: The model provider (default: "openai")
         AI_MODEL: The model name (default: "gpt-4o")
         OPENROUTER_API_KEY: API key for OpenRouter (if provider is "openrouter")
+        OLLAMA_BASE_URL: Base URL for Ollama (default: "http://127.0.0.1:11434")
     """
     provider = os.getenv("AI_PROVIDER", "openrouter")
     model_name = os.getenv("AI_MODEL", "openrouter/owl-alpha")
@@ -30,6 +31,8 @@ def get_model():
         kwargs["base_url"] = "https://openrouter.ai/api/v1"
         kwargs["api_key"] = os.getenv("OPENROUTER_API_KEY")
         provider = "openai"
+    elif provider == "ollama":
+        kwargs["base_url"] = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 
     model = init_chat_model(model_name, model_provider=provider, **kwargs)
     _MODEL_CACHE[cache_key] = model

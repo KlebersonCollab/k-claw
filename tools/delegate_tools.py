@@ -10,7 +10,6 @@ from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from core.utils import cap_tool_output
-from tools.registry import _HARNESS_REF
 
 
 @tool
@@ -18,6 +17,7 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
     """Delegates a task to a specialist sub-agent (coder, researcher)."""
     from infra.agent_loader import agent_loader
     from core.ui_interface import get_current_session_id
+    from tools.registry import _HARNESS_REF
 
     current_session = get_current_session_id() or "unknown"
 
@@ -56,10 +56,44 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
             "incognito": False,
             "yolo": parent_yolo,
         }
+
+        # Step 1: Execute Specialist Task
         result_state = await _HARNESS_REF.ainvoke(
             sub_state, config={"configurable": {"thread_id": sub_state["session_id"]}}
         )
         final_report = result_state["messages"][-1].content
+
+        # Step 2: Automatic Verification for 'coder'
+        if agent_id == "coder":
+            max_retries = 3
+            retries = 0
+
+            while retries < max_retries:
+                # Trigger Verifier
+                verifier_mission = f"Verify this Coder's report and work. Mission was: {mission}\n\nCoder's Report:\n{final_report}"
+                verifier_result = await delegate_to_agent.ainvoke(
+                    {"agent_id": "verifier", "mission": verifier_mission, "parent_yolo": parent_yolo}
+                )
+
+                # Check status in verifier result (looking for STATUS: PASS)
+                if "STATUS: PASS" in verifier_result:
+                    return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - VERIFIED PASS:\n{cap_tool_output(final_report, max_chars=4000)}\n\n--- Verification Summary ---\n{verifier_result}"
+
+                # If FAIL/NEEDS_REVIEW, loop back to Coder with feedback
+                retries += 1
+                if retries >= max_retries:
+                    return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - ESCALATED (Verification Failed after {retries} retries):\n{cap_tool_output(final_report, max_chars=4000)}\n\n--- Final Verification Failure ---\n{verifier_result}"
+
+                # Feedback to Coder
+                mission = f"Fix the issues found in verification. Original Mission: {mission}\n\nVerification Feedback:\n{verifier_result}"
+                sub_state["messages"].append(HumanMessage(content=mission))
+                sub_state["iteration_count"] = 0 # Reset iteration for correction
+
+                result_state = await _HARNESS_REF.ainvoke(
+                    sub_state, config={"configurable": {"thread_id": sub_state["session_id"]}}
+                )
+                final_report = result_state["messages"][-1].content
+
         return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}):\n{cap_tool_output(final_report, max_chars=4000)}"
 
     except Exception as e:

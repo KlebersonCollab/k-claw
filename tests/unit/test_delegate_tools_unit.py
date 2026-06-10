@@ -19,7 +19,7 @@ async def test_delegate_to_agent_success():
         "max_iterations": 5
     }
 
-    with patch("tools.delegate_tools._HARNESS_REF", mock_harness):
+    with patch("tools.registry._HARNESS_REF", mock_harness):
         with patch("infra.agent_loader.agent_loader.load_agent", return_value=mock_config):
             with patch("core.ui_interface.get_current_session_id", return_value="parent-session"):
                 result = await delegate_to_agent.ainvoke({
@@ -31,7 +31,7 @@ async def test_delegate_to_agent_success():
 
 @pytest.mark.asyncio
 async def test_delegate_to_agent_no_harness():
-    with patch("tools.delegate_tools._HARNESS_REF", None):
+    with patch("tools.registry._HARNESS_REF", None):
         result = await delegate_to_agent.ainvoke({
             "agent_id": "coder",
             "mission": "test"
@@ -40,7 +40,7 @@ async def test_delegate_to_agent_no_harness():
 
 @pytest.mark.asyncio
 async def test_delegate_to_agent_exception():
-    with patch("tools.delegate_tools._HARNESS_REF", MagicMock()):
+    with patch("tools.registry._HARNESS_REF", MagicMock()):
         with patch("infra.agent_loader.agent_loader.load_agent", side_effect=Exception("Load error")):
             result = await delegate_to_agent.ainvoke({
                 "agent_id": "bad-agent",

@@ -5,7 +5,7 @@ Importe do sub-módulo específico ou use este barrel para compatibilidade.
 """
 
 from tools.classification import classify_shell_command, risk_level_value
-from tools.registry import ToolDescriptor, ToolRegistry, registry, set_harness_refs, _HARNESS_REF
+from tools.registry import ToolDescriptor, ToolRegistry, registry, set_harness_refs
 from tools.file_tools import list_directory, read_file, replace_string, write_file, grep_search, glob_search
 from tools.shell_tools import run_shell
 from tools.memory_tools import search_memory, fetch_memory_detail, forget_session
@@ -20,7 +20,6 @@ __all__ = [
     "ToolRegistry",
     "registry",
     "set_harness_refs",
-    "_HARNESS_REF",
     # file tools
     "list_directory",
     "read_file",

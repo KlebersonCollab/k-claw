@@ -54,6 +54,7 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
         sub_session_id = f"sub-{current_session[:8]}-{agent_id}-{ts}"
 
         # Setup Git Worktree for isolation if no workspace_path provided
+        main_repo_path = os.getcwd()
         if not active_workspace:
             try:
                 temp_dir = tempfile.gettempdir()
@@ -86,6 +87,18 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
         )
         final_report = result_state["messages"][-1].content
 
+        # Sync changes back to main repo for ALL agents that created a worktree
+        # but for 'coder' we only do it if verification PASSES (handled below)
+        if agent_id != "coder" and worktree_created and active_workspace:
+            try:
+                subprocess.run(["git", "add", "."], cwd=active_workspace, check=True, capture_output=True)
+                status_res = subprocess.run(["git", "status", "--porcelain"], cwd=active_workspace, capture_output=True, text=True)
+                if status_res.stdout.strip():
+                    subprocess.run(["git", "commit", "-m", f"sub-agent {agent_id} changes"], cwd=active_workspace, check=True, capture_output=True)
+                    subprocess.run(["git", "pull", active_workspace], cwd=main_repo_path, check=True, capture_output=True)
+            except Exception as sync_err:
+                final_report += f"\n\n[WARNING: Failed to sync changes back to main repo: {sync_err}]"
+
         # Step 2: Automatic Verification for 'coder'
         if agent_id == "coder":
             max_retries = 3
@@ -102,8 +115,21 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
 
                 # Check status in verifier result (looking for STATUS: PASS)
                 if "STATUS: PASS" in verifier_result:
-                    return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - VERIFIED PASS:\n{cap_tool_output(final_report, max_chars=4000)}\n\n--- Verification Summary ---\n{verifier_result}"
+                    # Sync changes back to main repo before finishing
+                    if worktree_created and active_workspace:
+                        try:
+                            # 1. Commit changes in worktree
+                            subprocess.run(["git", "add", "."], cwd=active_workspace, check=True, capture_output=True)
+                            # Check if there are changes to commit
+                            status_res = subprocess.run(["git", "status", "--porcelain"], cwd=active_workspace, capture_output=True, text=True)
+                            if status_res.stdout.strip():
+                                subprocess.run(["git", "commit", "-m", f"sub-agent {agent_id} changes"], cwd=active_workspace, check=True, capture_output=True)
+                                # 2. Pull changes into main repo (using the worktree commit)
+                                subprocess.run(["git", "pull", active_workspace], cwd=main_repo_path, check=True, capture_output=True)
+                        except Exception as sync_err:
+                            final_report += f"\n\n[WARNING: Failed to sync changes back to main repo: {sync_err}]"
 
+                    return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - VERIFIED PASS:\n{cap_tool_output(final_report, max_chars=4000)}\n\n--- Verification Summary ---\n{verifier_result}"
                 # If FAIL/NEEDS_REVIEW, loop back to Coder with feedback
                 retries += 1
                 if retries >= max_retries:

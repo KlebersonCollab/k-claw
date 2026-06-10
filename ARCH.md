@@ -1,6 +1,6 @@
 # Agent Harness — Documentação de Arquitetura
 
-> **Versão:** 0.1.0 · **Python:** ≥3.13 · **Gerenciador de Pacotes:** `uv`
+> **Versão:** 0.1.0 · **Python:** ≥3.13 · **Gerenciador de Pacotes:** `uv` · **Última Atualização:** 2026-01-17
 
 ---
 
@@ -49,6 +49,7 @@ graph TB
     subgraph "Sub-Agentes Especialistas"
         CODER["coder<br/>Permissão: write"]
         RESEARCHER["researcher<br/>Permissão: read"]
+        VERIFIER["verifier<br/>Permissão: read"]
     end
 
     subgraph "Persistência & Memória"
@@ -70,8 +71,10 @@ graph TB
     TOOLS --> PERSIST
     LOADER --> CODER
     LOADER --> RESEARCHER
+    LOADER --> VERIFIER
     CODER --> HARNESS
     RESEARCHER --> HARNESS
+    VERIFIER --> HARNESS
     PERSIST --> PDB
     PDB --> SQLITE
     LOGIC --> UTILS
@@ -240,6 +243,9 @@ flowchart TB
 | **Modo Incógnito** | Ativado pelo usuário | `state["incognito"]` — bypass de todos os `SessionLogger` writes |
 | **PathFilter** | `list_directory`, `read_file`, `write_file` | `path_filter.is_ignored(path)` — bloqueia acesso |
 | **Hierarquia de Permissões** | `get_langchain_tools(current_permissions)` | read(1) ≤ write(2) ≤ execute(3) |
+| **Classificação de Comandos** | `run_shell` | `tools/classification.py` — classifica em `read`/`write`/`full` risk |
+| **Pre-commit Hooks** | Antes de cada commit | `scripts/check_secrets.py` — escaneia API keys; hooks de formatação |
+| **Life Cycle Hooks** | Antes/depois de cada tool call | `core/hooks.py` — `HookManager` com pre-tool (pode bloquear/modificar) e post-tool (audit) |
 
 ---
 
@@ -262,6 +268,7 @@ flowchart TB
     subgraph "Sub-Agentes"
         CODER["coder<br/><br/>• Permissão: write<br/>• Skills: python-patterns<br/>• Cria/edita arquivos<br/>• Executa código"]
         RESEARCHER["researcher<br/><br/>• Permissão: read<br/>• Analisa documentação<br/>• Busca informações<br/>• Síntese de resultados"]
+        VERIFIER["verifier<br/><br/>• Permissão: read<br/>• Valida código e artefatos<br/>• Verifica testes (unit/e2e/edge)<br/>• Checa cobertura >= 90%<br/>• Retorna PASS/FAIL/NEEDS_REVIEW"]
     end
 
     subgraph "Contexto Recursivo"
@@ -273,13 +280,16 @@ flowchart TB
     AL -->|"load_agent()"| DELEG
     DELEG -->|"Cria sub-state"| CODER
     DELEG -->|"Cria sub-state"| RESEARCHER
+    DELEG -->|"Cria sub-state"| VERIFIER
     CODER -->|"Technical Report"| ORCH
     RESEARCHER -->|"Technical Report"| ORCH
+    VERIFIER -->|"Verification Report"| ORCH
     CTX -->|"Contexto dinâmico"| ORCH
 
     style ORCH fill:#e3f2fd,stroke:#1565c0
     style CODER fill:#e8f5e9,stroke:#2e7d32
     style RESEARCHER fill:#fce4ec,stroke:#c62828
+    style VERIFIER fill:#fff9c4,stroke:#f9a825
     style AL fill:#fff3e0,stroke:#e65100
     style DELEG fill:#f3e5f5,stroke:#6a1b9a
 ```
@@ -679,4 +689,4 @@ erDiagram
 
 ---
 
-*Documentação gerada a partir da análise direta do código-fonte. Última atualização: 2025.*
+*Documentação gerada a partir da análise direta do código-fonte. Última atualização: 2026-01-17.*

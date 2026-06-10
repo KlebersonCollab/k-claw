@@ -7,7 +7,7 @@ PORT = 8000
 PID_FILE = .api.pid
 BOT_PID = .bot.pid
 
-.PHONY: install run start stop restart clean status help cli bot bot-start bot-stop bot-status clear-memory logs setup-hooks generate-tools yolo setup test
+.PHONY: install run start stop restart clean status help cli bot bot-start bot-stop bot-status clear-memory logs setup-hooks generate-tools yolo setup test test-unit test-integration test-e2e test-edge test-cov test-all
 
 help:
 	@echo "Available commands:"
@@ -29,7 +29,13 @@ help:
 	@echo "  make setup-hooks  - Install pre-commit security hooks"
 	@echo "  make generate-tools - Consolidate tool manuals into TOOLS.md"
 	@echo "  make logs         - Show API logs"
-	@echo "  make test         - Run tests using pytest"
+	@echo "  make test         - Run all tests using pytest"
+	@echo "  make test-unit    - Run unit tests only"
+	@echo "  make test-integration - Run integration tests only"
+	@echo "  make test-e2e     - Run end-to-end tests only"
+	@echo "  make test-edge    - Run edge case tests only"
+	@echo "  make test-cov     - Run tests with coverage report (>= 90%)"
+	@echo "  make test-all     - Run all tests with coverage"
 
 setup:
 	@if [ ! -f .env ]; then \
@@ -40,6 +46,24 @@ setup:
 
 test:
 	PYTHONPATH=. uv run python -m pytest
+
+test-unit:
+	PYTHONPATH=. uv run python -m pytest tests/unit/ -v
+
+test-integration:
+	PYTHONPATH=. uv run python -m pytest tests/integration/ -v
+
+test-e2e:
+	PYTHONPATH=. uv run python -m pytest tests/e2e/ -v
+
+test-edge:
+	PYTHONPATH=. uv run python -m pytest tests/edge_cases/ -v
+
+test-cov:
+	PYTHONPATH=. uv run python -m pytest --cov=. --cov-report=term-missing --cov-fail-under=90
+
+test-all:
+	PYTHONPATH=. uv run python -m pytest --cov=. --cov-report=term-missing --cov-report=html --cov-fail-under=90 -v
 
 install:
 	uv sync

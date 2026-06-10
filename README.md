@@ -34,6 +34,8 @@ Projetado para ser **extensível**, **seguro** e **observável**, o framework pe
 | 📦 **Compactação de Contexto** | Geração automática de "State Memo" quando o orçamento de contexto é excedido |
 | 📂 **Carregamento Dinâmico** | Sub-agentes definidos em `.md` com YAML frontmatter; skills injetados na delegação |
 | 🔁 **Multi-Provider LLM** | Suporte para OpenAI, Anthropic (Claude), Google, OpenRouter e Ollama (local) |
+| 🔗 **Life Cycle Hooks** | Pre-tool e post-tool hooks para extensibilidade sem tocar no harness |
+| 🔄 **Loop de Correção** | Orquestrador com loop coder → verifier com max retries e decisão DELIVER/ESCALATE |
 | 🖥️ **CLI Interativa** | REPL com Rich (tabelas, cores, prompts, status) + opção de retomar sessões |
 | 🌐 **REST API** | Endpoints FastAPI: `/chat`, `/approve`, `/stream`, `/status`, `/health` |
 | 📱 **Telegram Bot** | Integração completa com Telegram, incluindo autorização por user ID |
@@ -288,6 +290,11 @@ graph TB
     subgraph "Orquestração (LangGraph)"
         HARNESS["harness.py<br/>StateGraph<br/>START → agent → tools → compact"]
         PROMPT["prompt_builder.py<br/>System Prompt<br/>Assembly + Cache"]
+        HOOKS["hooks.py<br/>Life Cycle Hooks<br/>pre-tool / post-tool"]
+    end
+
+    subgraph "Orquestrador Pai"
+        ORCH["orchestrator.py<br/>Loop Coder → Verifier<br/>DELIVER / ESCALATE / LOOP"]
     end
 
     subgraph "Ferramentas"
@@ -296,6 +303,7 @@ graph TB
         SHELL[("shell_tools.py<br/>run_shell + classificação")]
         MEMORY[("memory_tools.py<br/>search/fetch/forget")]
         DELEGATE[("delegate_tools.py<br/>delegate_to_agent")]
+        CLASSIFY[("classification.py<br/>Risco: read/write/full")]
     end
 
     subgraph "Sub-Agentes"
@@ -313,16 +321,22 @@ graph TB
     API --> HARNESS
     BOT --> HARNESS
     HARNESS --> PROMPT
+    HARNESS --> HOOKS
     HARNESS --> REGISTRY
     REGISTRY --> FILE
     REGISTRY --> SHELL
     REGISTRY --> MEMORY
     REGISTRY --> DELEGATE
+    REGISTRY --> CLASSIFY
     DELEGATE --> CODER
     DELEGATE --> RESEARCHER
     DELEGATE --> LOADER
+    ORCH --> CODER
+    ORCH --> RESEARCHER
     HARNESS --> PERSIST
     PERSIST --> DB
+    HOOKS -.-> SHELL
+    HOOKS -.-> FILE
 ```
 
 ### Fluxo de Execução
@@ -374,6 +388,7 @@ Os sub-agentes são carregados dinamicamente de `.agents/agents/*.md` com YAML f
 |---|---|---|---|
 | 🛠️ **Coder** | `coder` | `write` | Especialista em escrita de código, refatoração e correção de bugs |
 | 🔬 **Researcher** | `researcher` | `read` | Especialista em busca semântica e análise de documentos |
+| ✅ **Verifier** | `verifier` | `read` | Validação de código, testes e artefatos; verifica cobertura >= 90% |
 
 ### Skills Disponíveis
 
@@ -538,13 +553,15 @@ Os hooks verificam:
 
 O Agent Harness implementa múltiplas camadas de segurança:
 
-1. **Controle de Permissões** — Hierarquia read → write → execute
-2. **Human-in-the-Loop** — Aprovação obrigatória para operações destrutivas
-3. **Redação de Segredos** — Chaves de API mascaradas automaticamente via regex
-4. **Classificação de Comandos Shell** — Risco avaliado antes da execução
-5. **Autorização Telegram** — Lista de IDs permitidos
-6. **Pre-commit Hooks** — Verificação de segredos no código antes do commit
-7. **Modo Incógnito** — Desativa toda persistência quando necessário
+1. **Controle de Permissões** — Hierarquia `read` → `write` → `execute`; ferramentas só são expostas conforme o nível.
+2. **Human-in-the-Loop (HITL)** — Aprovação obrigatória para operações destrutivas (`write_file`, `run_shell`, `forget_session`).
+3. **Redação de Segredos** — Chaves de API (OpenAI, Anthropic, Google) mascaradas automaticamente via regex em logs e outputs.
+4. **Classificação de Comandos Shell** — `tools/classification.py` classifica comandos em `read`/`write`/`full` risk antes da execução.
+5. **Pre-commit Hooks** — `scripts/check_secrets.py` escaneia arquivos por API keys antes do commit; hooks de formatação e YAML.
+6. **Life Cycle Hooks** — `core/hooks.py` permite registrar pre-tool hooks (podem bloquear/modificar) e post-tool hooks (audit/observabilidade).
+7. **Autorização Telegram** — Lista de IDs permitidos para interação via bot.
+8. **Modo Incógnito** — Desativa toda persistência quando necessário (nenhum log no SQLite).
+9. **Modo YOLO** — Pula aprovações interativas (apenas para desenvolvimento).
 
 ---
 
@@ -632,8 +649,15 @@ Contribuições são bem-vindas! Para contribuir:
 
 **Antes de enviar:**
 - Certifique-se de que os testes passam: `make test`
-- Verifique o coverage: `uv run pytest --cov=.`
+- Verifique o coverage (mínimo 90%): `make test-cov`
 - Rode os hooks: `uv run pre-commit run --all-files`
+- Todo código deve ter testes: unitários, integração, e2e e edge cases (conforme `AGENTS.md`)
+
+**Padrões de Qualidade:**
+- Cobertura de testes >= 90% (`make test-cov`)
+- Pre-commit hooks ativos (`make setup-hooks`)
+- Documentação atualizada para novas funcionalidades
+- Seguir o fluxo de delegação: Orquestrador → coder → verifier → decisão
 
 ---
 

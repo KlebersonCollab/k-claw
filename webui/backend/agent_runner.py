@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Callable, Optional, List, Dict
 
 from models import LogEntry
+from workspace_manager import WORKSPACES_DIR
 
 
 # Active WebSocket connections per workspace
@@ -79,7 +80,7 @@ async def run_mission(workspace_id: str, mission: str, agent_id: str = "coder") 
     Raises:
         FileNotFoundError: If workspace doesn't exist.
     """
-    workspace_path = Path("workspaces") / workspace_id
+    workspace_path = WORKSPACES_DIR / workspace_id
 
     if not workspace_path.exists():
         raise FileNotFoundError(f"Workspace '{workspace_id}' not found")

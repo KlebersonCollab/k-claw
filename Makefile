@@ -7,7 +7,7 @@ PORT = 8000
 PID_FILE = .api.pid
 BOT_PID = .bot.pid
 
-.PHONY: install run start stop restart clean status help cli bot bot-start bot-stop bot-status clear-memory logs setup-hooks generate-tools yolo setup test test-unit test-integration test-e2e test-edge test-cov test-all
+.PHONY: install run start stop restart clean status help cli bot bot-start bot-stop bot-status clear-memory logs setup-hooks generate-tools yolo setup test test-unit test-integration test-e2e test-edge test-cov test-all webui-backend-install webui-backend-run webui-backend-test webui-frontend-install webui-frontend-run webui-frontend-build webui-frontend-test webui-install webui-run webui-test webui-build
 
 help:
 	@echo "Available commands:"
@@ -36,6 +36,18 @@ help:
 	@echo "  make test-edge    - Run edge case tests only"
 	@echo "  make test-cov     - Run tests with coverage report (>= 90%)"
 	@echo "  make test-all     - Run all tests with coverage"
+	@echo ""
+	@echo "WebUI commands:"
+	@echo "  make webui-backend-install  - Install WebUI backend dependencies"
+	@echo "  make webui-backend-run      - Run WebUI backend (port 8000)"
+	@echo "  make webui-backend-test     - Run WebUI backend tests"
+	@echo "  make webui-frontend-install - Install WebUI frontend dependencies"
+	@echo "  make webui-frontend-run     - Run WebUI frontend (port 5173)"
+	@echo "  make webui-frontend-build   - Build WebUI frontend for production"
+	@echo "  make webui-install          - Install all WebUI dependencies"
+	@echo "  make webui-run              - Run WebUI (backend + frontend)"
+	@echo "  make webui-test             - Run all WebUI tests"
+	@echo "  make webui-build            - Build WebUI for production"
 
 setup:
 	@if [ ! -f .env ]; then \
@@ -153,3 +165,43 @@ clean:
 	rm -f .api.pid .bot.pid
 	rm -f api.log bot.log
 	find . -type d -name "__pycache__" -exec rm -rf {} +
+
+# ==================== WebUI Commands ====================
+
+WEBUI_BACKEND_DIR = webui/backend
+WEBUI_FRONTEND_DIR = webui/frontend
+
+## WebUI Backend
+webui-backend-install:
+	cd $(WEBUI_BACKEND_DIR) && pip install -r requirements.txt
+
+webui-backend-run:
+	cd $(WEBUI_BACKEND_DIR) && uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+webui-backend-test:
+	cd $(WEBUI_BACKEND_DIR) && python -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-fail-under=90
+
+## WebUI Frontend
+webui-frontend-install:
+	cd $(WEBUI_FRONTEND_DIR) && npm install
+
+webui-frontend-run:
+	cd $(WEBUI_FRONTEND_DIR) && npm run dev
+
+webui-frontend-build:
+	cd $(WEBUI_FRONTEND_DIR) && npm run build
+
+webui-frontend-test:
+	cd $(WEBUI_FRONTEND_DIR) && npm run build
+
+## WebUI Combined
+webui-install: webui-backend-install webui-frontend-install
+
+webui-run:
+	@echo "Starting WebUI..."
+	@cd $(WEBUI_BACKEND_DIR) && uvicorn main:app --reload --host 0.0.0.0 --port 8000 & \
+	cd $(WEBUI_FRONTEND_DIR) && npm run dev
+
+webui-test: webui-backend-test webui-frontend-test
+
+webui-build: webui-frontend-build

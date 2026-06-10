@@ -11,7 +11,7 @@ Use esta ferramenta para terceirizar tarefas complexas para especialistas.
 
 **REGRAS DE OURO:**
 - **MISSÃO:** Forneça um briefing técnico claro (OBJECTIVE, RESOURCES, CONSTRAINTS).
-- **ESPECIALISTAS:** Use `coder` para código e `researcher` para análises.
+- **ESPECIALISTAS:** Use `coder` para código, `researcher` para análises e `verifier` para validação independente de artefatos e testes.
 
 ---
 ### Tool: glob_search

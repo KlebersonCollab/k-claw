@@ -21,6 +21,7 @@ class HarnessState(TypedDict):
     iteration_count: int # Current iteration count
     session_id: str      # For persistence
     permissions: str     # Current permission level (e.g., "read", "write", "admin")
+    workspace_path: Optional[str] # Path to the active workspace (e.g. root or git worktree)
 
     # Summary of older context (for compaction)
     context_summary: str

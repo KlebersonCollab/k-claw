@@ -78,6 +78,9 @@ async def execute_tools(state: HarnessState) -> dict:
         await emit_event(EventType.TOOL_START, {"tool": tool_name, "args": tool_args})
         if desc:
             try:
+                # Inject workspace_path from state if not already in args
+                if "workspace_path" not in tool_args and state.get("workspace_path"):
+                     tool_args["workspace_path"] = state["workspace_path"]
                 result = await desc.handler.ainvoke(tool_args)
             except Exception as e:
                 result = f"Error: {str(e)}"

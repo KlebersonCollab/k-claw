@@ -11,16 +11,22 @@ from core.utils import redact_sensitive_info, path_filter, cap_tool_output
 
 
 @tool
-def list_directory(path: str = ".") -> str:
+def list_directory(path: str = ".", workspace_path: Optional[str] = None) -> str:
     """Lists files and directories at a given path, respecting project ignore rules."""
     try:
-        if path_filter.is_ignored(path):
+        base = workspace_path if workspace_path and os.path.exists(workspace_path) else "."
+        target = os.path.join(base, path)
+
+        if path_filter.is_ignored(target):
             return f"Access denied: {path} is an ignored path."
-        items = os.listdir(path)
+
+        items = os.listdir(target)
         visible_items = []
         for item in items:
-            item_path = os.path.join(path, item)
-            if not path_filter.is_ignored(item_path):
+            item_path = os.path.join(target, item)
+            # Use relative path for ignore check to keep it consistent
+            rel_path = os.path.relpath(item_path, base)
+            if not path_filter.is_ignored(rel_path):
                 type_suffix = "/" if os.path.isdir(item_path) else ""
                 visible_items.append(f"{item}{type_suffix}")
         return "\n".join(sorted(visible_items)) if visible_items else "Directory is empty."
@@ -29,15 +35,18 @@ def list_directory(path: str = ".") -> str:
 
 
 @tool
-def read_file(path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
+def read_file(path: str, start_line: Optional[int] = None, end_line: Optional[int] = None, workspace_path: Optional[str] = None) -> str:
     """Reads a file from disk with optional line-range pagination (1-based indexing)."""
     try:
-        if path_filter.is_ignored(path):
+        base = workspace_path if workspace_path and os.path.exists(str(workspace_path)) else "."
+        target = os.path.join(str(base), path)
+
+        if path_filter.is_ignored(target):
             return f"Access denied: {path} is an ignored path."
-        if os.path.isdir(path):
+        if os.path.isdir(target):
             return f"Error: {path} is a directory. Use list_directory instead."
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(target, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         total_lines = len(lines)
@@ -63,13 +72,16 @@ def read_file(path: str, start_line: Optional[int] = None, end_line: Optional[in
 
 
 @tool
-def replace_string(path: str, old_string: str, new_string: str) -> str:
+def replace_string(path: str, old_string: str, new_string: str, workspace_path: Optional[str] = None) -> str:
     """Surgically replaces a specific exact string block in a file with a new string."""
     try:
-        if path_filter.is_ignored(path):
+        base = workspace_path if workspace_path and os.path.exists(workspace_path) else "."
+        target = os.path.join(base, path)
+
+        if path_filter.is_ignored(target):
             return f"Access denied: {path} is an ignored path."
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(target, "r", encoding="utf-8") as f:
             content = f.read()
 
         occurrences = content.count(old_string)
@@ -81,7 +93,7 @@ def replace_string(path: str, old_string: str, new_string: str) -> str:
 
         new_content = content.replace(old_string, new_string)
 
-        with open(path, "w", encoding="utf-8") as f:
+        with open(target, "w", encoding="utf-8") as f:
             f.write(new_content)
 
         return f"Successfully updated {path}. Replaced 1 exact match."
@@ -90,12 +102,19 @@ def replace_string(path: str, old_string: str, new_string: str) -> str:
 
 
 @tool
-def write_file(path: str, content: str) -> str:
+def write_file(path: str, content: str, workspace_path: Optional[str] = None) -> str:
     """Writes content to a file (WARNING: Overwrites entire file)."""
     try:
-        if path_filter.is_ignored(path):
+        base = workspace_path if workspace_path and os.path.exists(workspace_path) else "."
+        target = os.path.join(base, path)
+
+        if path_filter.is_ignored(target):
             return f"Access denied: {path} is an ignored path."
-        with open(path, "w", encoding="utf-8") as f:
+
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+
+        with open(target, "w", encoding="utf-8") as f:
             f.write(content)
         return f"File {path} written successfully."
     except Exception as e:
@@ -103,7 +122,7 @@ def write_file(path: str, content: str) -> str:
 
 
 @tool
-def grep_search(pattern: str, path: str = ".", include_pattern: Optional[str] = None, context: int = 0) -> str:
+def grep_search(pattern: str, path: str = ".", include_pattern: Optional[str] = None, context: int = 0, workspace_path: Optional[str] = None) -> str:
     """Searches for a regex pattern in file contents.
 
     Args:
@@ -111,14 +130,18 @@ def grep_search(pattern: str, path: str = ".", include_pattern: Optional[str] = 
         path: Directory or file to search in (default is current).
         include_pattern: Glob pattern to filter files (e.g. "*.py").
         context: Number of lines of context to show around matches.
+        workspace_path: Optional base path for the search.
     """
     import re
     import glob
     try:
-        if path_filter.is_ignored(path):
+        base = workspace_path if workspace_path and os.path.exists(workspace_path) else "."
+        target = os.path.join(base, path)
+
+        if path_filter.is_ignored(target):
             return f"Access denied: {path} is an ignored path."
 
-        search_path = os.path.join(path, "**", include_pattern) if include_pattern else os.path.join(path, "**", "*")
+        search_path = os.path.join(target, "**", include_pattern) if include_pattern else os.path.join(target, "**", "*")
         files = glob.glob(search_path, recursive=True)
         results = []
         regex = re.compile(pattern, re.IGNORECASE)
@@ -135,7 +158,10 @@ def grep_search(pattern: str, path: str = ".", include_pattern: Optional[str] = 
                             start = max(0, i - context)
                             end = min(len(lines), i + context + 1)
                             match_block = "".join(lines[start:end])
-                            results.append(f"--- Match in {file_path} (Line {i+1}) ---\n{match_block}")
+
+                            # Show path relative to base for better readability
+                            rel_file_path = os.path.relpath(file_path, base)
+                            results.append(f"--- Match in {rel_file_path} (Line {i+1}) ---\n{match_block}")
             except Exception:
                 continue
 
@@ -150,16 +176,24 @@ def grep_search(pattern: str, path: str = ".", include_pattern: Optional[str] = 
 
 
 @tool
-def glob_search(pattern: str, path: str = ".") -> str:
+def glob_search(pattern: str, path: str = ".", workspace_path: Optional[str] = None) -> str:
     """Finds files matching a glob pattern (e.g. '**/*.py')."""
     import glob
     try:
-        if path_filter.is_ignored(path):
+        base = workspace_path if workspace_path and os.path.exists(workspace_path) else "."
+        target = os.path.join(base, path)
+
+        if path_filter.is_ignored(target):
             return f"Access denied: {path} is an ignored path."
 
-        search_pattern = os.path.join(path, pattern)
+        search_pattern = os.path.join(target, pattern)
         files = glob.glob(search_pattern, recursive=True)
-        visible_files = [f for f in files if not path_filter.is_ignored(f) and not os.path.isdir(f)]
+
+        visible_files = []
+        for f in files:
+            rel_path = os.path.relpath(f, base)
+            if not path_filter.is_ignored(rel_path) and not os.path.isdir(f):
+                visible_files.append(rel_path)
 
         if not visible_files:
             return f"No files found matching pattern '{pattern}'."

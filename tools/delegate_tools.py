@@ -13,16 +13,27 @@ from core.utils import cap_tool_output
 
 
 @tool
-async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = False) -> str:
+async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = False, workspace_path: Optional[str] = None) -> str:
     """Delegates a task to a specialist sub-agent (coder, researcher)."""
+    import subprocess
+    import tempfile
+    import os
+    import shutil
+    import time
+    import traceback
     from infra.agent_loader import agent_loader
     from core.ui_interface import get_current_session_id
     from tools.registry import _HARNESS_REF
+    from langchain_core.messages import SystemMessage, HumanMessage
 
     current_session = get_current_session_id() or "unknown"
 
     if _HARNESS_REF is None:
         return "Error: Harness not initialized."
+
+    active_workspace = workspace_path
+    worktree_created = False
+
     try:
         config = agent_loader.load_agent(agent_id)
         specialist_prompt = config["instructions"].replace("{{mission}}", mission)
@@ -42,6 +53,17 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
         ts = int(time.time()) % 10000
         sub_session_id = f"sub-{current_session[:8]}-{agent_id}-{ts}"
 
+        # Setup Git Worktree for isolation if no workspace_path provided
+        if not active_workspace:
+            try:
+                temp_dir = tempfile.gettempdir()
+                active_workspace = os.path.join(temp_dir, f"k-claw-{sub_session_id}")
+                # Use --detach to avoid branch conflicts
+                subprocess.run(["git", "worktree", "add", "--detach", active_workspace, "HEAD"], check=True, capture_output=True, text=True)
+                worktree_created = True
+            except Exception as wt_err:
+                active_workspace = None
+
         sub_state = {
             "messages": [
                 SystemMessage(content=f"{specialist_prompt}\n{briefing}{tools_manual}{skills_content}"),
@@ -52,6 +74,7 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
             "iteration_count": 0,
             "session_id": sub_session_id,
             "permissions": specialist_permissions,
+            "workspace_path": active_workspace,
             "context_summary": "",
             "incognito": False,
             "yolo": parent_yolo,
@@ -71,8 +94,10 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
             while retries < max_retries:
                 # Trigger Verifier
                 verifier_mission = f"Verify this Coder's report and work. Mission was: {mission}\n\nCoder's Report:\n{final_report}"
+
+                # Pass the SAME active_workspace to the verifier so it can see the coder's work
                 verifier_result = await delegate_to_agent.ainvoke(
-                    {"agent_id": "verifier", "mission": verifier_mission, "parent_yolo": parent_yolo}
+                    {"agent_id": "verifier", "mission": verifier_mission, "parent_yolo": parent_yolo, "workspace_path": active_workspace}
                 )
 
                 # Check status in verifier result (looking for STATUS: PASS)
@@ -98,3 +123,11 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
 
     except Exception as e:
         return f"Error delegating to sub-agent '{agent_id}': {str(e)}\nTrace: {traceback.format_exc()}"
+    finally:
+        # Cleanup worktree only if we created it here
+        if worktree_created and active_workspace:
+            try:
+                subprocess.run(["git", "worktree", "remove", "--force", active_workspace], check=True, capture_output=True)
+            except Exception:
+                if os.path.exists(active_workspace):
+                    shutil.rmtree(active_workspace, ignore_errors=True)

@@ -33,10 +33,16 @@ def should_continue(state: HarnessState) -> Literal["tools", "compact", "reflect
             return "compact"
         return "tools"
 
-    # If no tools were called, check if we should reflect
+    # If no tools were called, check if we should reflect or pivot
     messages = state.get("messages", [])
     if messages and isinstance(messages[-1], AIMessage):
         content = messages[-1].content or ""
+        
+        # PIVOT Check: If agent says it needs to change plan or discovered something critical
+        pivot_keywords = ["preciso ajustar o plano", "mudar estratégia", "descobri que o plano", "update plan", "pivot"]
+        if any(kw in content.lower() for kw in pivot_keywords):
+            return "planner"
+
         intent_keywords = ["vou solicitar", "delegar", "solicitar ao", "call the", "delegate to", "i will", "preciso envolver"]
         if any(kw in content.lower() for kw in intent_keywords):
             return "reflection"

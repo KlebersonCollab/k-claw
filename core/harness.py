@@ -4,6 +4,7 @@ from .state import HarnessState
 from .model_caller import call_model
 from .planner import plan_task
 from .reflection import reflect_on_action
+from .post_mortem import run_post_mortem
 from .dialog_control import should_continue
 from .tool_executor import execute_tools
 from .compaction import compact_context
@@ -26,6 +27,7 @@ def create_harness():
     workflow.add_node("tools", execute_tools)
     workflow.add_node("compact", compact_context)
     workflow.add_node("reflection", reflect_on_action)
+    workflow.add_node("post_mortem", run_post_mortem)
 
     # Set Entry Point with conditional routing
     workflow.add_conditional_edges(
@@ -41,7 +43,17 @@ def create_harness():
     workflow.add_conditional_edges(
         "agent",
         should_continue,
+        {
+            "tools": "tools",
+            "compact": "compact",
+            "reflection": "reflection",
+            "planner": "planner",
+            "__end__": "post_mortem"
+        }
     )
+
+    # Edge from post_mortem to actual end
+    workflow.add_edge("post_mortem", END)
 
     # Edge from reflection back to agent
     workflow.add_edge("reflection", "agent")

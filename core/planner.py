@@ -16,13 +16,12 @@ async def plan_task(state: HarnessState) -> dict:
     Returns:
         Updated state with the generated plan.
     """
-    if state.get("plan") and state["iteration_count"] > 0:
-        # Plan already exists and we are mid-execution, don't re-plan unless requested
-        # (For now, we only plan once at the start or if plan is empty)
-        return {}
-
-    await emit_event(EventType.THINKING_START, {"agent": "Planner"})
     model = get_model()
+    
+    # Determine if this is initial planning or a PIVOT (re-planning)
+    is_pivot = bool(state.get("plan") and state["iteration_count"] > 0)
+    
+    await emit_event(EventType.THINKING_START, {"agent": "Planner" if not is_pivot else "Pivot"})
 
     planning_prompt = (
         "You are the Strategic Planner K-Claw.\n"
@@ -34,10 +33,19 @@ async def plan_task(state: HarnessState) -> dict:
         "- SUCCESS_CRITERIA: How to know when the plan is complete.\n\n"
         "Return ONLY the YAML block."
     )
+    
+    if is_pivot:
+        planning_prompt += (
+            "\n\nCRITICAL: This is a PIVOT. You are updating an existing plan because new information was discovered.\n"
+            "Analyze the last findings and the PREVIOUS plan. Adjust the steps to stay on track or change strategy if necessary."
+        )
+        current_context = f"PREVIOUS PLAN:\n{state['plan']}\n\nLATEST FINDINGS:\n{state['messages'][-1].content}"
+    else:
+        current_context = f"Request: {state['messages'][-1].content if state['messages'] else 'No request yet'}"
 
     messages = [
         SystemMessage(content=planning_prompt),
-        HumanMessage(content=f"Request: {state['messages'][-1].content if state['messages'] else 'No request yet'}")
+        HumanMessage(content=current_context)
     ]
 
     resp = await model.ainvoke(messages)
@@ -49,7 +57,7 @@ async def plan_task(state: HarnessState) -> dict:
     elif "```" in plan_yaml:
         plan_yaml = plan_yaml.split("```")[1].split("```")[0].strip()
 
-    await emit_event(EventType.THINKING_END, {"agent": "Planner"})
+    await emit_event(EventType.THINKING_END, {"agent": "Planner" if not is_pivot else "Pivot"})
 
     return {
         "plan": plan_yaml,

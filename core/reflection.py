@@ -29,26 +29,36 @@ async def reflect_on_action(state: HarnessState) -> dict:
     # Keywords that indicate intent to act but might be missing a tool call
     intent_keywords = ["vou solicitar", "delegar", "solicitar ao", "call the", "delegate to", "i will", "preciso envolver"]
     
+    # Technical actions that require assumption validation
+    action_keywords = ["escrever", "alterar", "deletar", "executar", "write", "modify", "delete", "execute"]
+
     has_intent = any(kw in content.lower() for kw in intent_keywords)
+    requires_validation = any(kw in content.lower() for kw in action_keywords)
     
-    if has_intent:
+    if has_intent or requires_validation:
         await emit_event(EventType.THINKING_START, {"agent": "Reflection"})
         
-        correction_prompt = (
-            "REFLECTION ALERT: You expressed an intent to delegate or perform an action, "
-            "but you did NOT call any tools. \n\n"
-            "If you intended to delegate to a specialist (architect, coder, etc.), "
-            "you MUST use the `delegate_to_agent` tool now. \n"
-            "Do not just talk about it; EXECUTE the tool call."
-        )
+        correction_parts = []
+        if has_intent and not last_msg.tool_calls:
+            correction_parts.append(
+                "ACTION REQUIRED: You expressed intent to act but didn't call a tool. "
+                "Execute the tool call immediately (e.g., `delegate_to_agent`)."
+            )
         
-        # We inject a small correction message to nudge the agent
-        # We return it in a way that the harness can use to loop back to 'agent'
-        await emit_event(EventType.THINKING_END, {"agent": "Reflection"})
-        
-        return {
-            "scratchpad": [HumanMessage(content=correction_prompt)],
-            "iteration_count": state["iteration_count"] + 1
-        }
+        if requires_validation:
+            correction_parts.append(
+                "EPISTEMOLOGICAL CHECK: Before performing this technical action, "
+                "you MUST explicitly list your ASSUMPTIONS (premises). "
+                "Are you sure about the file path? The module structure? "
+                "State your assumptions clearly before acting."
+            )
+
+        # If we have something to say, nudge the agent
+        if correction_parts:
+            await emit_event(EventType.THINKING_END, {"agent": "Reflection"})
+            return {
+                "scratchpad": [HumanMessage(content="\n\n".join(correction_parts))],
+                "iteration_count": state["iteration_count"] + 1
+            }
 
     return {}

@@ -67,14 +67,14 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     base_prompt = (
         "You are the Orchestrator Agent (Father) K-Claw.\n"
         "Your role is to STRATEGIZE and DELEGATE. You never perform technical tasks directly.\n\n"
-        "STRICT PROTOCOL:\n"
-        "1. PLANNING: Create a multi-step plan before delegating. Use 'internal monologue' to reason through dependencies.\n"
-        "2. ARCHITECT FIRST: For any complex change, delegate to the `architect` agent first to get a design report.\n"
-        "3. DELEGATE: Use specialists (`coder`, `researcher`, `verifier`) for all technical actions.\n"
-        "4. ACTION OVER TALK: When you decide to delegate, call the `delegate_to_agent` tool IMMEDIATELY. Do not explain your intention to the user first unless you need clarification.\n"
-        "5. REVIEW: Critically review specialist reports. If the `verifier` fails a task, loop back to the `coder` with feedback.\n"
+        "REASONING 2.0 PROTOCOL:\n"
+        "1. PLANNING & PIVOTING: Follow your Technical Plan. If findings contradict the plan, say 'Preciso ajustar o plano' to trigger a PIVOT.\n"
+        "2. EPISTEMOLOGICAL CHECK: Before any technical action (write/execute), you MUST list your ASSUMPTIONS. Verify premises before acting.\n"
+        "3. ACTION OVER TALK: When you decide to delegate, call `delegate_to_agent` IMMEDIATELY. Do not explain unless necessary.\n"
+        "4. ARCHITECT FIRST: Delegate to `architect` for design reports on complex changes.\n"
+        "5. REVIEW & LOOP: Critically review specialist reports. If `verifier` fails, loop back to `coder` with feedback.\n"
         "6. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy.\n"
-        "7. NO EMPTY RESPONSES: You MUST always provide a response or call a tool. Never return an empty message."
+        "7. NO EMPTY RESPONSES: Always provide a response or call a tool."
     )
     available_agents = agent_loader.list_available_agents()
     agents_catalog = "\n\n### Specialists Catalog:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])
@@ -86,10 +86,14 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     else:
         extra_instructions = ""
 
+    # Load Golden Rules from Long-Term Memory
+    # (Simplified for now: we look for recent PM memories)
+    # Note: In a full implementation, search_memory would be called here.
+
     prompt_content = f"{base_prompt}{agents_catalog}{extra_instructions}\n\nPermissions: {state['permissions']}"
     
     if state.get('plan'):
-        prompt_content += f"\n\n### ACTIVE TECHNICAL PLAN (YAML):\n{state['plan']}\n\nStrictly follow the steps in this plan. Use 'internal monologue' to track your progress."
+        prompt_content += f"\n\n### ACTIVE TECHNICAL PLAN (YAML):\n{state['plan']}"
 
     if state.get('context_summary'):
         # Structured State Memo (YAML)

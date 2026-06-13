@@ -69,7 +69,7 @@ async def chat(request: ChatRequest):
     config = {"configurable": {"thread_id": session_id}}
     harness_metadata = {
         "context_budget": 10, "iteration_count": 0, "session_id": session_id,
-        "permissions": "execute", "context_summary": "", "incognito": False
+        "permissions": "execute", "context_summary": "", "plan": "", "incognito": False
     }
 
     # 3. Stream Events

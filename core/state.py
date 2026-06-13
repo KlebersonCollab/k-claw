@@ -26,6 +26,9 @@ class HarnessState(TypedDict):
     # Summary of older context (for compaction)
     context_summary: str
 
+    # Structured technical plan (YAML)
+    plan: str
+
     # Flags
     incognito: bool # If True, don't log to DB
     yolo: bool      # If True, bypass all approvals

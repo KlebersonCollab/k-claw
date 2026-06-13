@@ -92,7 +92,7 @@ async def run_cli():
         "context_budget": 50, "max_iterations": 50, "iteration_count": 0,
         "session_id": session_id,
         "permissions": os.getenv("HARNESS_PERMISSIONS", "execute"),
-        "context_summary": "", "incognito": False, "yolo": args.yolo
+        "context_summary": "", "plan": "", "incognito": False, "yolo": args.yolo
     }
 
     console.print(f"[bold green]Session ID:[/bold green] {session_id}")

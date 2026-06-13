@@ -86,6 +86,10 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
         extra_instructions = ""
 
     prompt_content = f"{base_prompt}{agents_catalog}{extra_instructions}\n\nPermissions: {state['permissions']}"
+    
+    if state.get('plan'):
+        prompt_content += f"\n\n### ACTIVE TECHNICAL PLAN (YAML):\n{state['plan']}\n\nStrictly follow the steps in this plan. Use 'internal monologue' to track your progress."
+
     if state.get('context_summary'):
         # Structured State Memo (YAML)
         prompt_content += f"\n\n### LONG-TERM STATE MEMO (YAML):\n{state['context_summary']}"

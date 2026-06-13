@@ -61,11 +61,12 @@ class PathFilter:
 
     def __init__(self, root_path: str = "."):
         self.root_path = os.path.abspath(root_path)
-        # Patterns that match a whole directory name or file name
-        self.ignore_patterns = [
+        # Patterns that match a whole directory name or file name (always checked)
+        self.core_patterns = [
             ".git", ".venv", "__pycache__", "node_modules",
             ".api.pid", "api.log", "harness.db", "harness.db-shm", "harness.db-wal", ".agents"
         ]
+        self.gitignore_patterns = []
         self._load_gitignore()
 
     def _load_gitignore(self) -> None:
@@ -76,7 +77,12 @@ class PathFilter:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#"):
-                        self.ignore_patterns.append(line.rstrip("/"))
+                        self.gitignore_patterns.append(line.rstrip("/"))
+
+    @property
+    def ignore_patterns(self) -> List[str]:
+        """Expose full list of ignore patterns for compatibility with tests."""
+        return self.core_patterns + self.gitignore_patterns
 
     def is_ignored(self, path: str) -> bool:
         """Check if a path should be ignored based on patterns.
@@ -87,20 +93,44 @@ class PathFilter:
         Returns:
             True if the path should be ignored.
         """
-        full_path = os.path.abspath(path)
-        rel_path = os.path.relpath(full_path, self.root_path)
+        # Resolve relative paths relative to root_path, not the current working directory
+        if not os.path.isabs(path):
+            full_path = os.path.abspath(os.path.join(self.root_path, path))
+        else:
+            full_path = os.path.abspath(path)
 
-        if rel_path == ".":
-            return False
+        is_outside = False
+        try:
+            rel_path = os.path.relpath(full_path, self.root_path)
+            if rel_path == ".":
+                return False
+            if rel_path.startswith(".."):
+                is_outside = True
+            parts = rel_path.split(os.sep)
+        except ValueError:
+            # On Windows, paths on different drives/mounts cannot have a relative path.
+            is_outside = True
+            parts = full_path.split(os.sep)
 
         # Check every part of the path
-        parts = rel_path.split(os.sep)
         for part in parts:
-            if part in self.ignore_patterns:
+            if not part or part.endswith(":"):
+                continue
+
+            # 1. Check core patterns (always checked)
+            if part in self.core_patterns:
                 return True
-            for pattern in self.ignore_patterns:
+            for pattern in self.core_patterns:
                 if fnmatch.fnmatch(part, pattern):
                     return True
+
+            # 2. Check gitignore patterns (only checked if inside the workspace)
+            if not is_outside:
+                if part in self.gitignore_patterns:
+                    return True
+                for pattern in self.gitignore_patterns:
+                    if fnmatch.fnmatch(part, pattern):
+                        return True
         return False
 
 

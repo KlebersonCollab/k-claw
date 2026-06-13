@@ -25,7 +25,10 @@ def list_directory(path: str = ".", workspace_path: Optional[str] = None) -> str
         for item in items:
             item_path = os.path.join(target, item)
             # Use relative path for ignore check to keep it consistent
-            rel_path = os.path.relpath(item_path, base)
+            try:
+                rel_path = os.path.relpath(item_path, base)
+            except ValueError:
+                rel_path = item_path
             if not path_filter.is_ignored(rel_path):
                 type_suffix = "/" if os.path.isdir(item_path) else ""
                 visible_items.append(f"{item}{type_suffix}")
@@ -160,7 +163,10 @@ def grep_search(pattern: str, path: str = ".", include_pattern: Optional[str] = 
                             match_block = "".join(lines[start:end])
 
                             # Show path relative to base for better readability
-                            rel_file_path = os.path.relpath(file_path, base)
+                            try:
+                                rel_file_path = os.path.relpath(file_path, base)
+                            except ValueError:
+                                rel_file_path = file_path
                             results.append(f"--- Match in {rel_file_path} (Line {i+1}) ---\n{match_block}")
             except Exception:
                 continue
@@ -191,7 +197,10 @@ def glob_search(pattern: str, path: str = ".", workspace_path: Optional[str] = N
 
         visible_files = []
         for f in files:
-            rel_path = os.path.relpath(f, base)
+            try:
+                rel_path = os.path.relpath(f, base)
+            except ValueError:
+                rel_path = f
             if not path_filter.is_ignored(rel_path) and not os.path.isdir(f):
                 visible_files.append(rel_path)
 

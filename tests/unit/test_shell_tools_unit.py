@@ -22,7 +22,9 @@ class TestRunShell:
 
     def test_handles_timeout(self):
         """Commands that timeout should return error."""
-        result = run_shell.invoke({"command": "sleep 60"})
+        import sys
+        cmd = "powershell -Command Start-Sleep 60" if sys.platform == "win32" else "sleep 60"
+        result = run_shell.invoke({"command": cmd})
         assert "Error" in result or "timeout" in result.lower()
 
     def test_invalid_command(self):

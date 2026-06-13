@@ -75,7 +75,7 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
 
     dynamic_context = recursive_load_context()
     if dynamic_context:
-        capped_context = cap_tool_output(dynamic_context, max_chars=2000)
+        capped_context = cap_tool_output(dynamic_context, max_chars=8000)
         extra_instructions = f"\n\n### Project Context:\n{capped_context}"
     else:
         extra_instructions = ""

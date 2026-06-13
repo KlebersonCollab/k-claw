@@ -163,8 +163,8 @@ class TestWriteFileEdgeCases:
     """Edge cases for write_file."""
 
     def test_write_to_nonexistent_directory(self, temp_dir):
-        """Write to a file in a nonexistent directory."""
-        test_file = os.path.join(temp_dir, "nonexistent_dir", "file.txt")
+        """Write to a file with an invalid path containing a null byte."""
+        test_file = os.path.join(temp_dir, "invalid_\x00_file.txt")
         result = write_file.invoke({"path": test_file, "content": "test"})
         assert "Error" in result
 

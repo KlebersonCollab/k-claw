@@ -30,7 +30,7 @@ class Orchestrator:
 
     def execute_task(self, task: str) -> dict:
         """
-        Execute a full task through the coder → verifier loop.
+        Execute a full task through the architect → coder → verifier loop.
 
         Returns a dict with:
             - decision: "DELIVER" | "ESCALATE"
@@ -40,13 +40,17 @@ class Orchestrator:
         """
         correction_rounds = 0
 
-        # Step 1: Delegate to coder
-        coder_report = self.delegate_to_agent("coder", task)
+        # Step 1: Delegate to architect for design
+        design_report = self.delegate_to_agent("architect", f"Design the solution for: {task}")
 
-        # Step 2: Delegate to verifier with coder's report
+        # Step 2: Delegate to coder with design report
+        coder_mission = f"Implement the task based on this design report: {design_report}. Task: {task}"
+        coder_report = self.delegate_to_agent("coder", coder_mission)
+
+        # Step 3: Delegate to verifier with coder's report
         verifier_report = self.delegate_to_agent(
             "verifier",
-            f"Verify the coder's work. Technical Report: {coder_report}"
+            f"Verify the coder's work. Original Task: {task}. Technical Report: {coder_report}"
         )
 
         # Step 3: Decision loop

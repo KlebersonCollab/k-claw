@@ -386,6 +386,7 @@ Os sub-agentes são carregados dinamicamente de `.agents/agents/*.md` com YAML f
 
 | Agente | ID | Permissão | Descrição |
 |---|---|---|---|
+| 🛠️ **Architect** | `architect` | `read` | Especialista em design de sistemas, padrões e integridade arquitetural |
 | 🛠️ **Coder** | `coder` | `write` | Especialista em escrita de código, refatoração e correção de bugs |
 | 🔬 **Researcher** | `researcher` | `read` | Especialista em busca semântica e análise de documentos |
 | ✅ **Verifier** | `verifier` | `read` | Validação de código, testes e artefatos; verifica cobertura >= 90% |

@@ -54,35 +54,40 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
 
     if is_sub_agent:
         return SystemMessage(content=(
-            "You are a Specialist Sub-Agent K-Claw. Focus strictly on your technical mission.\n"
-            f"Permissions: {state['permissions']}\n"
-            "ANTI-HALLUCINATION: If a tool fails, report the error. NEVER guess contents.\n"
-            "TOKEN EFFICIENCY: Your output will be truncated if too large. Be concise."
+            "You are the Expert Specialist Agent K-Claw.\n"
+            "Your primary mission is to perform deep technical work in an isolated context.\n\n"
+            "STRICT PROTOCOL:\n"
+            "1. INTERNAL MONOLOGUE: Before any tool call, write a brief 1-2 sentence strategy in your thought process.\n"
+            "2. STATE MEMO: Always start by reading the `search_memory` results to sync with the long-term context.\n"
+            "3. SURGICAL ACTION: Use `grep_search` and `glob_search` for discovery. Never read entire files if a search suffices.\n"
+            "4. TECHNICAL RIGOR: Produce high-quality, idiomatic code/reports. All code MUST include comprehensive tests.\n"
+            "5. ANTI-HALLUCINATION: If a tool fails, report the error. NEVER invent facts or file contents.\n"
         ))
 
     base_prompt = (
         "You are the Orchestrator Agent (Father) K-Claw.\n"
+        "Your role is to STRATEGIZE and DELEGATE. You never perform technical tasks directly.\n\n"
         "STRICT PROTOCOL:\n"
-        "1. SURGICAL SEARCH: Use `grep_search` and `glob_search` to find relevant code or information. NEVER read entire files if you can search for patterns.\n"
-        "2. DELEGATE technical tasks (reading/writing files, shell commands, research) to the appropriate specialist.\n"
-        "3. You are responsible for identifying WHICH specialist is needed and providing a detailed MISSION briefing.\n"
-        "4. Review the specialist's REPORT and relay the conclusion to the user.\n"
-        "5. ANTI-HALLUCINATION: Never invent file contents or tool results. If delegation fails, report the error.\n"
+        "1. PLANNING: Create a multi-step plan before delegating. Use 'internal monologue' to reason through dependencies.\n"
+        "2. ARCHITECT FIRST: For any complex change, delegate to the `architect` agent first to get a design report.\n"
+        "3. DELEGATE: Use specialists (`coder`, `researcher`, `verifier`) for all technical actions.\n"
+        "4. REVIEW: Critically review specialist reports. If the `verifier` fails a task, loop back to the `coder` with feedback.\n"
+        "5. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy. Never read entire files.\n"
         "6. TOKEN SAFETY: Huge tool outputs are truncated. Use surgical search and specialists to manage large data."
     )
     available_agents = agent_loader.list_available_agents()
-    agents_catalog = "\n\n### Specialists:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])
+    agents_catalog = "\n\n### Specialists Catalog:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])
 
     dynamic_context = recursive_load_context()
     if dynamic_context:
         capped_context = cap_tool_output(dynamic_context, max_chars=8000)
-        extra_instructions = f"\n\n### Project Context:\n{capped_context}"
+        extra_instructions = f"\n\n### Project Global Context:\n{capped_context}"
     else:
         extra_instructions = ""
 
     prompt_content = f"{base_prompt}{agents_catalog}{extra_instructions}\n\nPermissions: {state['permissions']}"
     if state.get('context_summary'):
-        capped_memo = cap_tool_output(state['context_summary'], max_chars=2000)
-        prompt_content += f"\n\n### State Memo:\n{capped_memo}"
+        # Structured State Memo (YAML)
+        prompt_content += f"\n\n### LONG-TERM STATE MEMO (YAML):\n{state['context_summary']}"
 
     return SystemMessage(content=prompt_content)

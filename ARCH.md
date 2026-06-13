@@ -47,6 +47,7 @@ graph TB
     end
 
     subgraph "Sub-Agentes Especialistas"
+        ARCHITECT["architect<br/>Permissão: read"]
         CODER["coder<br/>Permissão: write"]
         RESEARCHER["researcher<br/>Permissão: read"]
         VERIFIER["verifier<br/>Permissão: read"]
@@ -69,9 +70,11 @@ graph TB
     LOGIC --> TOOLS
     TOOLS --> LOADER
     TOOLS --> PERSIST
+    LOADER --> ARCHITECT
     LOADER --> CODER
     LOADER --> RESEARCHER
     LOADER --> VERIFIER
+    ARCHITECT --> HARNESS
     CODER --> HARNESS
     RESEARCHER --> HARNESS
     VERIFIER --> HARNESS
@@ -110,7 +113,7 @@ sequenceDiagram
 
         alt Contexto excedido
             SC->>Compact: compact_context(state)
-            Note over Compact: Gera State Memo via LLM<br/>Salva na memória de longo prazo
+            Note over Compact: Gera State Memo ESTRUTURADO (YAML)<br/>Salva na memória de longo prazo
             Compact->>Tools: execute_tools(state compactado)
         else Contexto OK
             SC->>Tools: execute_tools(state)
@@ -266,7 +269,8 @@ flowchart TB
     end
 
     subgraph "Sub-Agentes"
-        CODER["coder<br/><br/>• Permissão: write<br/>• Skills: python-patterns<br/>• Cria/edita arquivos<br/>• Executa código"]
+        ARCHITECT["architect<br/><br/>• Permissão: read<br/>• Design de sistemas<br/>• Revisão de padrões<br/>• Design Report"]
+        CODER["coder<br/><br/>• Permissão: write<br/>• Skills: python-patterns<br/>• Cria/edita arquivos<br/>• Executa código<br/>• Loop verifier automático"]
         RESEARCHER["researcher<br/><br/>• Permissão: read<br/>• Analisa documentação<br/>• Busca informações<br/>• Síntese de resultados"]
         VERIFIER["verifier<br/><br/>• Permissão: read<br/>• Valida código e artefatos<br/>• Verifica testes (unit/e2e/edge)<br/>• Checa cobertura >= 90%<br/>• Retorna PASS/FAIL/NEEDS_REVIEW"]
     end
@@ -278,9 +282,11 @@ flowchart TB
     ORCH -->|"Identifica especialista"| DELEG
     AL -->|"list_available_agents()"| ORCH
     AL -->|"load_agent()"| DELEG
+    DELEG -->|"Cria sub-state"| ARCHITECT
     DELEG -->|"Cria sub-state"| CODER
     DELEG -->|"Cria sub-state"| RESEARCHER
     DELEG -->|"Cria sub-state"| VERIFIER
+    ARCHITECT -->|"Design Report"| ORCH
     CODER -->|"Technical Report"| ORCH
     RESEARCHER -->|"Technical Report"| ORCH
     VERIFIER -->|"Verification Report"| ORCH

@@ -11,7 +11,8 @@ def get_embeddings():
     global _EMBEDDINGS_MODEL
     if _EMBEDDINGS_MODEL is None:
         from langchain_huggingface import HuggingFaceEmbeddings
-        _EMBEDDINGS_MODEL = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        # BGE Small v1.5: 384 dimensions, state-of-the-art technical retrieval
+        _EMBEDDINGS_MODEL = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
     return _EMBEDDINGS_MODEL
 
 class SessionLogger:

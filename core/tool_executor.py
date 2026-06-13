@@ -35,6 +35,8 @@ async def execute_tools(state: HarnessState) -> dict:
     ui = get_ui()
     yolo_mode = state.get("yolo", False)
 
+    blackboard_updates = {}
+
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
@@ -82,6 +84,14 @@ async def execute_tools(state: HarnessState) -> dict:
                 if "workspace_path" not in tool_args and state.get("workspace_path"):
                      tool_args["workspace_path"] = state["workspace_path"]
                 result = await desc.handler.ainvoke(tool_args)
+                
+                # INTERCEPT BLACKBOARD UPDATES
+                if isinstance(result, str) and result.startswith("__BLACKBOARD_UPDATE__:"):
+                    import json
+                    payload = json.loads(result.split("__BLACKBOARD_UPDATE__:")[1])
+                    blackboard_updates.update(payload)
+                    result = f"Successfully updated blackboard with keys: {list(payload.keys())}"
+
             except Exception as e:
                 result = f"Error: {str(e)}"
         else:
@@ -109,4 +119,9 @@ async def execute_tools(state: HarnessState) -> dict:
         logger.log_messages(tool_messages)
 
     new_scratchpad = scratchpad + tool_messages
-    return {"scratchpad": new_scratchpad}
+    
+    return_state = {"scratchpad": new_scratchpad}
+    if blackboard_updates:
+        return_state["blackboard"] = blackboard_updates
+        
+    return return_state

@@ -11,6 +11,7 @@ from tools.shell_tools import run_shell
 from tools.memory_tools import search_memory, fetch_memory_detail, forget_session
 from tools.delegate_tools import delegate_to_agent
 from tools.env_tools import detect_workspace_env
+from tools.blackboard_tools import update_blackboard, read_blackboard
 
 __all__ = [
     # classification
@@ -38,6 +39,9 @@ __all__ = [
     "delegate_to_agent",
     # env tools
     "detect_workspace_env",
+    # blackboard tools
+    "update_blackboard",
+    "read_blackboard",
 ]
 
 # ── Auto-registro das tools no registry ──────────────────────────────────────
@@ -53,3 +57,5 @@ registry.register("fetch_memory_detail", "Reads full content of a memory ID.", "
 registry.register("forget_session", "Deletes data associated with a session ID.", "execute", forget_session, requires_approval=True)
 registry.register("delegate_to_agent", "Delegates a task to a specialist sub-agent.", "read", delegate_to_agent)
 registry.register("detect_workspace_env", "Detects the tech stack of the workspace.", "read", detect_workspace_env)
+registry.register("update_blackboard", "Saves a variable to the shared Blackboard.", "read", update_blackboard)
+registry.register("read_blackboard", "Reads the current shared Blackboard state.", "read", read_blackboard)

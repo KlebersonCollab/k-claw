@@ -74,6 +74,17 @@ def read_file(path: str, start_line: Optional[int] = None, end_line: Optional[in
         return f"Error reading file: {str(e)}"
 
 
+import subprocess
+
+def _syntax_check(file_path: str) -> str:
+    """Runs a quick syntax check on the file if supported."""
+    ext = os.path.splitext(file_path)[1]
+    if ext == '.py':
+        res = subprocess.run(['python', '-m', 'py_compile', file_path], capture_output=True, text=True)
+        if res.returncode != 0:
+            return f"\n\n[WARNING: SYNTAX ERROR DETECTED]\n{res.stderr.strip()}\nPlease fix this immediately."
+    return ""
+
 @tool
 def replace_string(path: str, old_string: str, new_string: str, workspace_path: Optional[str] = None) -> str:
     """Surgically replaces a specific exact string block in a file with a new string."""
@@ -99,7 +110,8 @@ def replace_string(path: str, old_string: str, new_string: str, workspace_path: 
         with open(target, "w", encoding="utf-8") as f:
             f.write(new_content)
 
-        return f"Successfully updated {path}. Replaced 1 exact match."
+        feedback = _syntax_check(target)
+        return f"Successfully updated {path}. Replaced 1 exact match.{feedback}"
     except Exception as e:
         return f"Error replacing string in file: {str(e)}"
 
@@ -119,7 +131,9 @@ def write_file(path: str, content: str, workspace_path: Optional[str] = None) ->
 
         with open(target, "w", encoding="utf-8") as f:
             f.write(content)
-        return f"File {path} written successfully."
+            
+        feedback = _syntax_check(target)
+        return f"File {path} written successfully.{feedback}"
     except Exception as e:
         return f"Error writing file: {str(e)}"
 

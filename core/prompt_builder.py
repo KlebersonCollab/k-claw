@@ -99,4 +99,8 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
         # Structured State Memo (YAML)
         prompt_content += f"\n\n### LONG-TERM STATE MEMO (YAML):\n{state['context_summary']}"
 
+    if state.get('blackboard'):
+        bb_content = "\n".join([f"- {k}: {v}" for k, v in state['blackboard'].items()])
+        prompt_content += f"\n\n### GLOBAL BLACKBOARD (Shared Variables):\n{bb_content}"
+
     return SystemMessage(content=prompt_content)

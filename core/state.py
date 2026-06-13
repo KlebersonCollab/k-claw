@@ -1,12 +1,21 @@
-from typing import Annotated, TypedDict, List, Optional
+from typing import Annotated, TypedDict, List, Optional, Any, Dict
 from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
+import operator
 
 def replace_scratchpad(existing: Optional[List[BaseMessage]], new: Optional[List[BaseMessage]]) -> List[BaseMessage]:
     """Reducer that replaces the scratchpad instead of appending, allowing it to be cleared."""
     if new is None:
         return []
     return new
+
+def merge_blackboard(existing: Optional[Dict[str, Any]], new: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Reducer that merges dict updates into the blackboard."""
+    if existing is None:
+        existing = {}
+    if new is not None:
+        existing.update(new)
+    return existing
 
 class HarnessState(TypedDict):
     # Standard LangGraph message history (Only User and Final AI responses)
@@ -22,6 +31,9 @@ class HarnessState(TypedDict):
     session_id: str      # For persistence
     permissions: str     # Current permission level (e.g., "read", "write", "admin")
     workspace_path: Optional[str] # Path to the active workspace (e.g. root or git worktree)
+
+    # Shared inter-agent context store
+    blackboard: Annotated[Dict[str, Any], merge_blackboard]
 
     # Summary of older context (for compaction)
     context_summary: str

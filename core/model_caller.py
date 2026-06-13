@@ -72,7 +72,17 @@ async def call_model(state: HarnessState) -> dict:
                 raise e # retry
             raise e # reraise if not a transient error
 
-    response = await _invoke_with_retry()
+    try:
+        response = await _invoke_with_retry()
+    except Exception as e:
+        # If we exhausted retries (e.g., persistent empty responses or provider errors)
+        # we recover gracefully by injecting a system warning instead of crashing the harness.
+        await emit_event(EventType.THINKING_END, {"agent": agent_name})
+        warning_msg = f"[SYSTEM WARNING] The LLM failed to generate a valid response after retries: {str(e)}. Please change your strategy or clarify the mission."
+        return {
+            "scratchpad": scratchpad + [AIMessage(content=warning_msg)],
+            "iteration_count": state["iteration_count"] + 1,
+        }
 
     await emit_event(EventType.THINKING_END, {"agent": agent_name})
 

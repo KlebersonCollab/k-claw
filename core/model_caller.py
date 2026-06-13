@@ -59,23 +59,22 @@ async def call_model(state: HarnessState) -> dict:
     )
     async def _invoke_with_retry():
         try:
-            return await model_with_tools.ainvoke(messages_for_llm)
+            res = await model_with_tools.ainvoke(messages_for_llm)
+            if not res.content and not res.tool_calls:
+                # LLM returned empty response without tool calls - this is usually a glitch
+                # or a misunderstanding of the prompt. We should treat it as an error to allow retry.
+                raise ValueError(f"LLM returned an empty response for session {state['session_id']}")
+            return res
         except ValueError as e:
             # specifically check for 502/503/504 style errors from provider
             err_msg = str(e)
-            if "502" in err_msg or "503" in err_msg or "504" in err_msg or "Provider returned error" in err_msg:
+            if "502" in err_msg or "503" in err_msg or "504" in err_msg or "Provider returned error" in err_msg or "empty response" in err_msg:
                 raise e # retry
-            raise e # reraise if not a transient error (though tenacity will retry based on type)
+            raise e # reraise if not a transient error
 
     response = await _invoke_with_retry()
 
     await emit_event(EventType.THINKING_END, {"agent": agent_name})
-
-    if not response.content and not response.tool_calls:
-        # LLM returned empty response without tool calls - this is usually a glitch
-        # or a misunderstanding of the prompt. We should treat it as an error to allow retry
-        # or at least not end the loop with a 'void' message.
-        raise ValueError(f"LLM returned an empty response for session {state['session_id']}")
 
     clean_content = redact_sensitive_info(response.content) if response.content else ""
 

@@ -28,4 +28,6 @@ def get_history(session_id):
     conn.close()
 
 if __name__ == "__main__":
-    get_history('07fd8e57-5c36-445c-9f78-eb875551e7b2')
+    import sys
+    sid = sys.argv[1] if len(sys.argv) > 1 else '07fd8e57-5c36-445c-9f78-eb875551e7b2'
+    get_history(sid)

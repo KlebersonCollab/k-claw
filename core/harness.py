@@ -3,6 +3,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from .state import HarnessState
 from .model_caller import call_model
 from .planner import plan_task
+from .reflection import reflect_on_action
 from .dialog_control import should_continue
 from .tool_executor import execute_tools
 from .compaction import compact_context
@@ -24,6 +25,7 @@ def create_harness():
     workflow.add_node("agent", call_model)
     workflow.add_node("tools", execute_tools)
     workflow.add_node("compact", compact_context)
+    workflow.add_node("reflection", reflect_on_action)
 
     # Set Entry Point with conditional routing
     workflow.add_conditional_edges(
@@ -40,6 +42,9 @@ def create_harness():
         "agent",
         should_continue,
     )
+
+    # Edge from reflection back to agent
+    workflow.add_edge("reflection", "agent")
 
     # Edge from compact back to agent
     workflow.add_edge("compact", "agent")

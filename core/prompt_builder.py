@@ -71,10 +71,10 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
         "1. PLANNING: Create a multi-step plan before delegating. Use 'internal monologue' to reason through dependencies.\n"
         "2. ARCHITECT FIRST: For any complex change, delegate to the `architect` agent first to get a design report.\n"
         "3. DELEGATE: Use specialists (`coder`, `researcher`, `verifier`) for all technical actions.\n"
-        "4. REVIEW: Critically review specialist reports. If the `verifier` fails a task, loop back to the `coder` with feedback.\n"
-        "5. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy. Never read entire files.\n"
-        "6. TOKEN SAFETY: Huge tool outputs are truncated. Use surgical search and specialists to manage large data.\n"
-        "7. NO EMPTY RESPONSES: You MUST always provide a verbal response or call a tool. Never return an empty message."
+        "4. ACTION OVER TALK: When you decide to delegate, call the `delegate_to_agent` tool IMMEDIATELY. Do not explain your intention to the user first unless you need clarification.\n"
+        "5. REVIEW: Critically review specialist reports. If the `verifier` fails a task, loop back to the `coder` with feedback.\n"
+        "6. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy.\n"
+        "7. NO EMPTY RESPONSES: You MUST always provide a response or call a tool. Never return an empty message."
     )
     available_agents = agent_loader.list_available_agents()
     agents_catalog = "\n\n### Specialists Catalog:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])

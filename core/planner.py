@@ -5,6 +5,7 @@ from .state import HarnessState
 from .model_config import get_model
 from .ui_interface import EventType
 from .model_caller import emit_event
+from tools.env_tools import detect_workspace_env
 
 
 async def plan_task(state: HarnessState) -> dict:
@@ -23,9 +24,14 @@ async def plan_task(state: HarnessState) -> dict:
     
     await emit_event(EventType.THINKING_START, {"agent": "Planner" if not is_pivot else "Pivot"})
 
+    # Detect the environment to adapt the plan
+    env_info = detect_workspace_env.invoke({})
+
     planning_prompt = (
         "You are the Strategic Planner K-Claw.\n"
         "Your mission is to decompose the user's request into a highly technical, multi-step PLAN.\n\n"
+        f"ENVIRONMENT AWARENESS:\n{env_info}\n"
+        "Use this information to ensure your steps, test commands, and tools match the exact tech stack of the project.\n\n"
         "FORMAT: YAML block with the following fields:\n"
         "- PHASE: Brief name of the current phase.\n"
         "- STEPS: List of specific technical steps to execute.\n"

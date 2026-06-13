@@ -10,6 +10,7 @@ from tools.file_tools import list_directory, read_file, replace_string, write_fi
 from tools.shell_tools import run_shell
 from tools.memory_tools import search_memory, fetch_memory_detail, forget_session
 from tools.delegate_tools import delegate_to_agent
+from tools.env_tools import detect_workspace_env
 
 __all__ = [
     # classification
@@ -35,6 +36,8 @@ __all__ = [
     "forget_session",
     # delegate tools
     "delegate_to_agent",
+    # env tools
+    "detect_workspace_env",
 ]
 
 # ── Auto-registro das tools no registry ──────────────────────────────────────
@@ -49,3 +52,4 @@ registry.register("search_memory", "Layered memory search (L1 index, L2 summary,
 registry.register("fetch_memory_detail", "Reads full content of a memory ID.", "read", fetch_memory_detail)
 registry.register("forget_session", "Deletes data associated with a session ID.", "execute", forget_session, requires_approval=True)
 registry.register("delegate_to_agent", "Delegates a task to a specialist sub-agent.", "read", delegate_to_agent)
+registry.register("detect_workspace_env", "Detects the tech stack of the workspace.", "read", detect_workspace_env)

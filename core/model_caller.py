@@ -71,6 +71,12 @@ async def call_model(state: HarnessState) -> dict:
 
     await emit_event(EventType.THINKING_END, {"agent": agent_name})
 
+    if not response.content and not response.tool_calls:
+        # LLM returned empty response without tool calls - this is usually a glitch
+        # or a misunderstanding of the prompt. We should treat it as an error to allow retry
+        # or at least not end the loop with a 'void' message.
+        raise ValueError(f"LLM returned an empty response for session {state['session_id']}")
+
     clean_content = redact_sensitive_info(response.content) if response.content else ""
 
     if response.tool_calls:

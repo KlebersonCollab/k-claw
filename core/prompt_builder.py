@@ -73,7 +73,8 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
         "3. DELEGATE: Use specialists (`coder`, `researcher`, `verifier`) for all technical actions.\n"
         "4. REVIEW: Critically review specialist reports. If the `verifier` fails a task, loop back to the `coder` with feedback.\n"
         "5. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy. Never read entire files.\n"
-        "6. TOKEN SAFETY: Huge tool outputs are truncated. Use surgical search and specialists to manage large data."
+        "6. TOKEN SAFETY: Huge tool outputs are truncated. Use surgical search and specialists to manage large data.\n"
+        "7. NO EMPTY RESPONSES: You MUST always provide a verbal response or call a tool. Never return an empty message."
     )
     available_agents = agent_loader.list_available_agents()
     agents_catalog = "\n\n### Specialists Catalog:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])

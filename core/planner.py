@@ -6,6 +6,7 @@ from .model_config import get_model
 from .ui_interface import EventType
 from .model_caller import emit_event
 from tools.env_tools import detect_workspace_env
+from infra.persistence import SessionLogger
 
 
 async def plan_task(state: HarnessState) -> dict:
@@ -27,10 +28,28 @@ async def plan_task(state: HarnessState) -> dict:
     # Detect the environment to adapt the plan
     env_info = detect_workspace_env.invoke({})
 
+    # RETRIEVE GOLDEN RULES (Long-Term Memory)
+    # Use the last message content to find relevant past lessons
+    query = state["messages"][-1].content if state["messages"] else "technical project patterns"
+    logger = SessionLogger(state["session_id"])
+    
+    past_lessons = ""
+    try:
+        # Search for "Technical Post-Mortem" or relevant technical keywords
+        memories = logger.semantic_search(query, limit=3)
+        if memories:
+            past_lessons = "\n\n### RELEVANT PAST LESSONS (GOLDEN RULES):\n"
+            for mem in memories:
+                if mem["score"] > 0.6: # Relevance threshold
+                    past_lessons += f"- {mem['summary']}: {mem['content']}\n"
+    except Exception as e:
+        print(f"[Planner] Warning: Could not retrieve past lessons: {e}")
+
     planning_prompt = (
         "You are the Strategic Planner K-Claw.\n"
         "Your mission is to decompose the user's request into a highly technical, multi-step PLAN.\n\n"
         f"ENVIRONMENT AWARENESS:\n{env_info}\n"
+        f"{past_lessons}\n"
         "Use this information to ensure your steps, test commands, and tools match the exact tech stack of the project.\n\n"
         "FORMAT: YAML block with the following fields:\n"
         "- PHASE: Brief name of the current phase.\n"

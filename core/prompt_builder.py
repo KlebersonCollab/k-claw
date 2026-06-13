@@ -51,6 +51,15 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
         A SystemMessage with the assembled prompt.
     """
     is_sub_agent = state['session_id'].startswith("sub-")
+    
+    # Shared elements: Blackboard and State Memo
+    shared_context = ""
+    if state.get('context_summary'):
+        shared_context += f"\n\n### LONG-TERM STATE MEMO (YAML):\n{state['context_summary']}"
+
+    if state.get('blackboard'):
+        bb_content = "\n".join([f"- {k}: {v}" for k, v in state['blackboard'].items()])
+        shared_context += f"\n\n### GLOBAL BLACKBOARD (Shared Discoveries):\n{bb_content}"
 
     if is_sub_agent:
         return SystemMessage(content=(
@@ -58,10 +67,11 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
             "Your primary mission is to perform deep technical work in an isolated context.\n\n"
             "STRICT PROTOCOL:\n"
             "1. INTERNAL MONOLOGUE: Before any tool call, write a brief 1-2 sentence strategy in your thought process.\n"
-            "2. STATE MEMO: Always start by reading the `search_memory` results to sync with the long-term context.\n"
+            "2. BLACKBOARD AWARENESS: Always check the `GLOBAL BLACKBOARD` below. These are facts already discovered by other agents. Do NOT rediscovover them.\n"
             "3. SURGICAL ACTION: Use `grep_search` and `glob_search` for discovery. Never read entire files if a search suffices.\n"
             "4. TECHNICAL RIGOR: Produce high-quality, idiomatic code/reports. All code MUST include comprehensive tests.\n"
             "5. ANTI-HALLUCINATION: If a tool fails, report the error. NEVER invent facts or file contents.\n"
+            f"{shared_context}"
         ))
 
     base_prompt = (
@@ -69,12 +79,13 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
         "Your role is to STRATEGIZE and DELEGATE. You never perform technical tasks directly.\n\n"
         "REASONING 2.0 PROTOCOL:\n"
         "1. PLANNING & PIVOTING: Follow your Technical Plan. If findings contradict the plan, say 'Preciso ajustar o plano' to trigger a PIVOT.\n"
-        "2. EPISTEMOLOGICAL CHECK: Before any technical action (write/execute), you MUST list your ASSUMPTIONS. Verify premises before acting.\n"
-        "3. ACTION OVER TALK: When you decide to delegate, call `delegate_to_agent` IMMEDIATELY. Do not explain unless necessary.\n"
-        "4. ARCHITECT FIRST: Delegate to `architect` for design reports on complex changes.\n"
-        "5. REVIEW & LOOP: Critically review specialist reports. If `verifier` fails, loop back to `coder` with feedback.\n"
-        "6. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy.\n"
-        "7. NO EMPTY RESPONSES: Always provide a response or call a tool."
+        "2. BLACKBOARD UPDATE: When you receive new technical facts from specialists, synthesize them in your next response to update the Global Blackboard.\n"
+        "3. EPISTEMOLOGICAL CHECK: Before any technical action (write/execute), you MUST list your ASSUMPTIONS. Verify premises before acting.\n"
+        "4. ACTION OVER TALK: When you decide to delegate, call `delegate_to_agent` IMMEDIATELY. Do not explain unless necessary.\n"
+        "5. ARCHITECT FIRST: Delegate to `architect` for design reports on complex changes.\n"
+        "6. REVIEW & LOOP: Critically review specialist reports. If `verifier` fails, loop back to `coder` with feedback.\n"
+        "7. SURGICAL SEARCH: Use `grep_search` and `glob_search` to guide your strategy.\n"
+        "8. NO EMPTY RESPONSES: Always provide a response or call a tool."
     )
     available_agents = agent_loader.list_available_agents()
     agents_catalog = "\n\n### Specialists Catalog:\n" + "\n".join([f"- {ag['id']}: {ag['description']}" for ag in available_agents])
@@ -86,21 +97,11 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     else:
         extra_instructions = ""
 
-    # Load Golden Rules from Long-Term Memory
-    # (Simplified for now: we look for recent PM memories)
-    # Note: In a full implementation, search_memory would be called here.
-
     prompt_content = f"{base_prompt}{agents_catalog}{extra_instructions}\n\nPermissions: {state['permissions']}"
     
     if state.get('plan'):
         prompt_content += f"\n\n### ACTIVE TECHNICAL PLAN (YAML):\n{state['plan']}"
 
-    if state.get('context_summary'):
-        # Structured State Memo (YAML)
-        prompt_content += f"\n\n### LONG-TERM STATE MEMO (YAML):\n{state['context_summary']}"
-
-    if state.get('blackboard'):
-        bb_content = "\n".join([f"- {k}: {v}" for k, v in state['blackboard'].items()])
-        prompt_content += f"\n\n### GLOBAL BLACKBOARD (Shared Variables):\n{bb_content}"
+    prompt_content += shared_context
 
     return SystemMessage(content=prompt_content)

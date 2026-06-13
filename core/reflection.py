@@ -35,6 +35,15 @@ async def reflect_on_action(state: HarnessState) -> dict:
     has_intent = any(kw in content.lower() for kw in intent_keywords)
     requires_validation = any(kw in content.lower() for kw in action_keywords)
     
+    # Plan Alignment Check
+    plan = state.get("plan", "")
+    is_deviating = False
+    if plan and requires_validation:
+        # Check if keywords from the proposed action are at least mentioned in the plan
+        # (This is a fuzzy check, but helps catch completely random actions)
+        # We look at the current action words and check if they exist in the plan.
+        pass # Fuzzy logic can be complex, let's stick to explicit protocol enforcement for now
+
     if has_intent or requires_validation:
         await emit_event(EventType.THINKING_START, {"agent": "Reflection"})
         
@@ -49,9 +58,14 @@ async def reflect_on_action(state: HarnessState) -> dict:
             correction_parts.append(
                 "EPISTEMOLOGICAL CHECK: Before performing this technical action, "
                 "you MUST explicitly list your ASSUMPTIONS (premises). "
-                "Are you sure about the file path? The module structure? "
-                "State your assumptions clearly before acting."
+                "Verify file paths and module structure in the `GLOBAL BLACKBOARD` or via `grep_search` before acting."
             )
+            
+            if plan and "ajustar o plano" not in content.lower():
+                correction_parts.append(
+                    "PLAN ALIGNMENT: Ensure this action is strictly mapped to a step in your ACTIVE TECHNICAL PLAN. "
+                    "If you need to deviate, say 'Preciso ajustar o plano' to trigger a PIVOT first."
+                )
 
         # If we have something to say, nudge the agent
         if correction_parts:

@@ -17,6 +17,14 @@ def merge_blackboard(existing: Optional[Dict[str, Any]], new: Optional[Dict[str,
         existing.update(new)
     return existing
 
+def merge_sets(existing: Optional[set], new: Optional[set]) -> set:
+    """Reducer that merges sets."""
+    if existing is None:
+        existing = set()
+    if new is not None:
+        return existing | new
+    return existing
+
 class HarnessState(TypedDict):
     # Standard LangGraph message history (Only User and Final AI responses)
     messages: Annotated[List[BaseMessage], add_messages]
@@ -31,6 +39,9 @@ class HarnessState(TypedDict):
     session_id: str      # For persistence
     permissions: str     # Current permission level (e.g., "read", "write", "admin")
     workspace_path: Optional[str] # Path to the active workspace (e.g. root or git worktree)
+
+    # Epistemological State: Paths and patterns that have been verified
+    verified_paths: Annotated[set, merge_sets]
 
     # Shared inter-agent context store
     blackboard: Annotated[Dict[str, Any], merge_blackboard]

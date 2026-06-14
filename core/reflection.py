@@ -1,13 +1,15 @@
 """Reflection node - validates agent responses against the plan and catches missing tool calls."""
 
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from .state import HarnessState
 from .ui_interface import EventType
 from .model_caller import emit_event
+import os
 
 
 async def reflect_on_action(state: HarnessState) -> dict:
     """Analyze the last agent response for missing actions or plan deviations.
+    Also enforces the EPISTEMOLOGICAL LOCK for destructive tools.
 
     Args:
         state: The current harness state.
@@ -15,40 +17,60 @@ async def reflect_on_action(state: HarnessState) -> dict:
     Returns:
         A dictionary that can trigger a self-correction message if needed.
     """
-    messages = state.get("messages", [])
-    if not messages or not isinstance(messages[-1], AIMessage):
+    scratchpad = state.get("scratchpad", [])
+    if not scratchpad or not isinstance(scratchpad[-1], AIMessage):
         return {}
 
-    last_msg = messages[-1]
+    last_msg = scratchpad[-1]
     content = last_msg.content or ""
     
-    # If the message already has tool calls, it's proceeding, no need for reflection now
+    # EPISTEMOLOGICAL LOCK: Block destructive tools if path not verified
     if last_msg.tool_calls:
-        return {}
+        verified_paths = state.get("verified_paths", set())
+        destructive_tools = ["write_file", "replace_string", "run_shell"]
+        lock_violations = []
 
-    # Keywords that indicate intent to act but might be missing a tool call
+        for tc in last_msg.tool_calls:
+            if tc["name"] in destructive_tools:
+                path = tc["args"].get("path") or tc["args"].get("file_path")
+                if path:
+                    from .dialog_control import is_path_verified
+                    is_dir = tc["name"] not in ["write_file", "replace_string"]
+                    if not is_path_verified(path, verified_paths, is_directory_op=is_dir):
+                        lock_violations.append(
+                            f"EPISTEMOLOGICAL VIOLATION: You are trying to use '{tc['name']}' on '{path}', "
+                            "but you haven't verified this path yet. You MUST use 'read_file', 'grep_search' or "
+                            "'list_directory' to establish a factual baseline before modifying any file."
+                        )
+
+        if lock_violations:
+            await emit_event(EventType.THINKING_START, {"agent": "Epistemological Lock"})
+            error_messages = [
+                ToolMessage(
+                    tool_call_id=tc["id"], 
+                    content=f"ERROR: Epistemological Lock engaged. You must verify '{tc['args'].get('path')}' before acting."
+                ) for tc in last_msg.tool_calls
+            ]
+            
+            nudge = HumanMessage(content="\n\n".join(lock_violations))
+            await emit_event(EventType.THINKING_END, {"agent": "Epistemological Lock"})
+            return {
+                "scratchpad": scratchpad + error_messages + [nudge],
+                "iteration_count": state["iteration_count"] + 1
+            }
+
+    # Standard reflection (intent/validation)
     intent_keywords = ["vou solicitar", "delegar", "solicitar ao", "call the", "delegate to", "i will", "preciso envolver"]
-    
-    # Technical actions that require assumption validation
     action_keywords = ["escrever", "alterar", "deletar", "executar", "write", "modify", "delete", "execute"]
 
     has_intent = any(kw in content.lower() for kw in intent_keywords)
     requires_validation = any(kw in content.lower() for kw in action_keywords)
     
-    # Plan Alignment Check
-    plan = state.get("plan", "")
-    is_deviating = False
-    if plan and requires_validation:
-        # Check if keywords from the proposed action are at least mentioned in the plan
-        # (This is a fuzzy check, but helps catch completely random actions)
-        # We look at the current action words and check if they exist in the plan.
-        pass # Fuzzy logic can be complex, let's stick to explicit protocol enforcement for now
-
-    if has_intent or requires_validation:
+    if (has_intent or requires_validation) and not last_msg.tool_calls:
         await emit_event(EventType.THINKING_START, {"agent": "Reflection"})
         
         correction_parts = []
-        if has_intent and not last_msg.tool_calls:
+        if has_intent:
             correction_parts.append(
                 "ACTION REQUIRED: You expressed intent to act but didn't call a tool. "
                 "Execute the tool call immediately (e.g., `delegate_to_agent`)."
@@ -61,29 +83,10 @@ async def reflect_on_action(state: HarnessState) -> dict:
                 "Verify file paths and module structure in the `GLOBAL BLACKBOARD` or via `grep_search` before acting."
             )
             
-            # More aggressive Pivot suggestion
-            if plan:
-                content_lower = content.lower()
-                plan_keywords = [step.split(":")[0].lower() for step in plan.split("-") if ":" in step]
-                is_matching_plan = any(kw in content_lower for kw in plan_keywords)
-                
-                if not is_matching_plan and "ajustar o plano" not in content_lower:
-                    correction_parts.append(
-                        "PLAN DEVIATION DETECTED: Your proposed action does not seem to match any step in your ACTIVE TECHNICAL PLAN. "
-                        "If you have discovered a better way or found a roadblock, you MUST say 'Preciso ajustar o plano' to update your strategy before proceeding."
-                    )
-                elif "erro" in content_lower or "falha" in content_lower or "não encontrei" in content_lower:
-                    correction_parts.append(
-                        "STRATEGIC ADVICE: You've encountered an issue or a gap. "
-                        "Consider saying 'Preciso ajustar o plano' to perform a PIVOT and incorporate these findings into a revised technical strategy."
-                    )
-
-        # If we have something to say, nudge the agent
-        if correction_parts:
-            await emit_event(EventType.THINKING_END, {"agent": "Reflection"})
-            return {
-                "scratchpad": [HumanMessage(content="\n\n".join(correction_parts))],
-                "iteration_count": state["iteration_count"] + 1
-            }
+        await emit_event(EventType.THINKING_END, {"agent": "Reflection"})
+        return {
+            "scratchpad": scratchpad + [HumanMessage(content="\n\n".join(correction_parts))],
+            "iteration_count": state["iteration_count"] + 1
+        }
 
     return {}

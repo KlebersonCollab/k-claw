@@ -36,6 +36,7 @@ async def execute_tools(state: HarnessState) -> dict:
     yolo_mode = state.get("yolo", False)
 
     blackboard_updates = {}
+    new_verified_paths = set()
 
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
@@ -89,6 +90,11 @@ async def execute_tools(state: HarnessState) -> dict:
                      tool_args["workspace_path"] = state["workspace_path"]
                 result = await desc.handler.ainvoke(tool_args)
                 
+                # UPDATE VERIFIED PATHS on success
+                if tool_name in ["read_file", "grep_search", "list_directory", "glob_search"]:
+                    path = tool_args.get("path") or tool_args.get("file_path") or "."
+                    new_verified_paths.add(path)
+
                 # INTERCEPT BLACKBOARD UPDATES
                 if isinstance(result, str) and result.startswith("__BLACKBOARD_UPDATE__:"):
                     import json
@@ -127,5 +133,7 @@ async def execute_tools(state: HarnessState) -> dict:
     return_state = {"scratchpad": new_scratchpad}
     if blackboard_updates:
         return_state["blackboard"] = blackboard_updates
+    if new_verified_paths:
+        return_state["verified_paths"] = new_verified_paths
         
     return return_state

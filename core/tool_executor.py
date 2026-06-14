@@ -42,9 +42,13 @@ async def execute_tools(state: HarnessState) -> dict:
         tool_args = tool_call["args"]
         desc = registry.tools.get(tool_name)
 
-        # YOLO Injection
+        # YOLO Injection & Context Propagation
         if tool_name == "delegate_to_agent":
             tool_args["parent_yolo"] = yolo_mode
+            if "blackboard" not in tool_args:
+                tool_args["blackboard"] = state.get("blackboard", {})
+            if "context_summary" not in tool_args:
+                tool_args["context_summary"] = state.get("context_summary", "")
 
         # PRE-TOOL HOOKS
         hook_result = await hook_manager.run_pre_tool(

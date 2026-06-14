@@ -13,7 +13,14 @@ from core.utils import cap_tool_output
 
 
 @tool
-async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = False, workspace_path: Optional[str] = None) -> str:
+async def delegate_to_agent(
+    agent_id: str, 
+    mission: str, 
+    parent_yolo: bool = False, 
+    workspace_path: Optional[str] = None,
+    blackboard: Optional[dict] = None,
+    context_summary: Optional[str] = None
+) -> str:
     """Delegates a task to a specialist sub-agent (coder, researcher)."""
     import subprocess
     import tempfile
@@ -21,6 +28,7 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
     import shutil
     import time
     import traceback
+    import json
     from infra.agent_loader import agent_loader
     from core.ui_interface import get_current_session_id
     from tools.registry import _HARNESS_REF
@@ -76,7 +84,8 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
             "session_id": sub_session_id,
             "permissions": specialist_permissions,
             "workspace_path": active_workspace,
-            "context_summary": "",
+            "context_summary": context_summary or "",
+            "blackboard": blackboard or {},
             "incognito": False,
             "yolo": parent_yolo,
         }
@@ -86,6 +95,7 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
             sub_state, config={"configurable": {"thread_id": sub_state["session_id"]}}
         )
         final_report = result_state["messages"][-1].content
+        sub_blackboard = result_state.get("blackboard", {})
 
         # Sync changes back to main repo for ALL agents that created a worktree
         # but for 'coder' we only do it if verification PASSES (handled below)
@@ -108,9 +118,16 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
                 # Trigger Verifier
                 verifier_mission = f"Verify this Coder's report and work. Mission was: {mission}\n\nCoder's Report:\n{final_report}"
 
-                # Pass the SAME active_workspace to the verifier so it can see the coder's work
+                # Pass the SAME active_workspace, blackboard, and summary to the verifier
                 verifier_result = await delegate_to_agent.ainvoke(
-                    {"agent_id": "verifier", "mission": verifier_mission, "parent_yolo": parent_yolo, "workspace_path": active_workspace}
+                    {
+                        "agent_id": "verifier", 
+                        "mission": verifier_mission, 
+                        "parent_yolo": parent_yolo, 
+                        "workspace_path": active_workspace,
+                        "blackboard": sub_blackboard,
+                        "context_summary": result_state.get("context_summary", "")
+                    }
                 )
 
                 # Check status in verifier result (looking for STATUS: PASS)
@@ -129,23 +146,35 @@ async def delegate_to_agent(agent_id: str, mission: str, parent_yolo: bool = Fal
                         except Exception as sync_err:
                             final_report += f"\n\n[WARNING: Failed to sync changes back to main repo: {sync_err}]"
 
-                    return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - VERIFIED PASS:\n{cap_tool_output(final_report, max_chars=4000)}\n\n--- Verification Summary ---\n{verifier_result}"
+                    report_prefix = f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - VERIFIED PASS:\n"
+                    if sub_blackboard:
+                        final_report += f"\n\n__BLACKBOARD_UPDATE__:{json.dumps(sub_blackboard)}"
+                    return f"{report_prefix}{cap_tool_output(final_report, max_chars=4000)}\n\n--- Verification Summary ---\n{verifier_result}"
+                
                 # If FAIL/NEEDS_REVIEW, loop back to Coder with feedback
                 retries += 1
                 if retries >= max_retries:
-                    return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - ESCALATED (Verification Failed after {retries} retries):\n{cap_tool_output(final_report, max_chars=4000)}\n\n--- Final Verification Failure ---\n{verifier_result}"
+                    report_prefix = f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}) - ESCALATED (Verification Failed after {retries} retries):\n"
+                    if sub_blackboard:
+                        final_report += f"\n\n__BLACKBOARD_UPDATE__:{json.dumps(sub_blackboard)}"
+                    return f"{report_prefix}{cap_tool_output(final_report, max_chars=4000)}\n\n--- Final Verification Failure ---\n{verifier_result}"
 
                 # Feedback to Coder
                 mission = f"Fix the issues found in verification. Original Mission: {mission}\n\nVerification Feedback:\n{verifier_result}"
                 sub_state["messages"].append(HumanMessage(content=mission))
                 sub_state["iteration_count"] = 0 # Reset iteration for correction
+                sub_state["blackboard"] = sub_blackboard # Ensure coder has latest findings
 
                 result_state = await _HARNESS_REF.ainvoke(
                     sub_state, config={"configurable": {"thread_id": sub_state["session_id"]}}
                 )
                 final_report = result_state["messages"][-1].content
+                sub_blackboard = result_state.get("blackboard", {})
 
-        return f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}):\n{cap_tool_output(final_report, max_chars=4000)}"
+        report_content = f"### TECHNICAL REPORT FROM SPECIALIST ({agent_id}):\n{cap_tool_output(final_report, max_chars=4000)}"
+        if sub_blackboard:
+            report_content += f"\n\n__BLACKBOARD_UPDATE__:{json.dumps(sub_blackboard)}"
+        return report_content
 
     except Exception as e:
         return f"Error delegating to sub-agent '{agent_id}': {str(e)}\nTrace: {traceback.format_exc()}"

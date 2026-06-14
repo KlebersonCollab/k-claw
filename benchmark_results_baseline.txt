@@ -1,0 +1,5 @@
+Total Tool Calls: 7
+Tool Calls Detail: ['run_shell', 'run_shell', 'update_blackboard', 'delegate_to_agent', 'glob_search', 'read_blackboard', 'read_file']
+Total Thinking Turns: 13
+List Directory Calls: 0
+Grep Search Calls: 0

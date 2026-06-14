@@ -61,11 +61,22 @@ async def reflect_on_action(state: HarnessState) -> dict:
                 "Verify file paths and module structure in the `GLOBAL BLACKBOARD` or via `grep_search` before acting."
             )
             
-            if plan and "ajustar o plano" not in content.lower():
-                correction_parts.append(
-                    "PLAN ALIGNMENT: Ensure this action is strictly mapped to a step in your ACTIVE TECHNICAL PLAN. "
-                    "If you need to deviate, say 'Preciso ajustar o plano' to trigger a PIVOT first."
-                )
+            # More aggressive Pivot suggestion
+            if plan:
+                content_lower = content.lower()
+                plan_keywords = [step.split(":")[0].lower() for step in plan.split("-") if ":" in step]
+                is_matching_plan = any(kw in content_lower for kw in plan_keywords)
+                
+                if not is_matching_plan and "ajustar o plano" not in content_lower:
+                    correction_parts.append(
+                        "PLAN DEVIATION DETECTED: Your proposed action does not seem to match any step in your ACTIVE TECHNICAL PLAN. "
+                        "If you have discovered a better way or found a roadblock, you MUST say 'Preciso ajustar o plano' to update your strategy before proceeding."
+                    )
+                elif "erro" in content_lower or "falha" in content_lower or "não encontrei" in content_lower:
+                    correction_parts.append(
+                        "STRATEGIC ADVICE: You've encountered an issue or a gap. "
+                        "Consider saying 'Preciso ajustar o plano' to perform a PIVOT and incorporate these findings into a revised technical strategy."
+                    )
 
         # If we have something to say, nudge the agent
         if correction_parts:

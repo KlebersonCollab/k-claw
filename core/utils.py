@@ -18,6 +18,33 @@ _CONTEXT_CACHE: dict = {"data": None, "timestamp": 0}
 CONTEXT_FILES = ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]
 
 
+def load_global_rules(root_path: str = ".") -> str:
+    """Load all rules from the .agents/rules directory.
+
+    Args:
+        root_path: The root directory of the project.
+
+    Returns:
+        Concatenated content of all rule files found.
+    """
+    rules_path = os.path.join(os.path.abspath(root_path), ".agents", "rules")
+    if not os.path.exists(rules_path):
+        return ""
+    
+    rules_content = []
+    try:
+        # Sort files to ensure consistent prompt ordering
+        for entry in sorted(os.listdir(rules_path)):
+            if entry.endswith(".md"):
+                file_path = os.path.join(rules_path, entry)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    rules_content.append(f"### RULE: {entry[:-3].upper()}\n{f.read()}")
+    except Exception as e:
+        return f"[Warning] Could not load global rules: {e}"
+    
+    return "\n\n".join(rules_content)
+
+
 def recursive_load_context(start_path: str = ".") -> str:
     """Walk up from start_path to root, collecting context files with a simple 60s cache.
 

@@ -4,7 +4,7 @@ from typing import Dict
 from langchain_core.messages import SystemMessage
 from .state import HarnessState
 from infra.agent_loader import agent_loader
-from .utils import cap_tool_output, recursive_load_context
+from .utils import cap_tool_output, recursive_load_context, load_global_rules
 
 
 # ── System Prompt Cache ──────────────────────────────────────────────────────
@@ -52,6 +52,12 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     """
     is_sub_agent = state['session_id'].startswith("sub-")
     
+    # Load global project rules (.agents/rules/*.md) - Strictly folder-based
+    global_rules = load_global_rules()
+    rules_block = ""
+    if global_rules:
+        rules_block = f"\n\n### MANDATORY GLOBAL PROJECT RULES (PRIORITY):\n{global_rules}"
+
     # Shared elements: Blackboard and State Memo
     shared_context = ""
     if state.get('context_summary'):
@@ -71,7 +77,7 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
             "3. SURGICAL ACTION: Use `grep_search` and `glob_search` for discovery. Never read entire files if a search suffices.\n"
             "4. TECHNICAL RIGOR: Produce high-quality, idiomatic code/reports. All code MUST include comprehensive tests.\n"
             "5. ANTI-HALLUCINATION: If a tool fails, report the error. NEVER invent facts or file contents.\n"
-            f"{shared_context}"
+            f"{shared_context}{rules_block}"
         ))
 
     base_prompt = (
@@ -102,6 +108,6 @@ def assemble_system_prompt(state: HarnessState) -> SystemMessage:
     if state.get('plan'):
         prompt_content += f"\n\n### ACTIVE TECHNICAL PLAN (YAML):\n{state['plan']}"
 
-    prompt_content += shared_context
+    prompt_content += f"{shared_context}{rules_block}"
 
     return SystemMessage(content=prompt_content)

@@ -95,6 +95,12 @@ async def call_model(state: HarnessState) -> dict:
             "iteration_count": state["iteration_count"] + 1,
         }
     else:
+        # If the response is empty and has no tool calls, it's a silent completion.
+        # We inject a default content to avoid confusing the user.
+        if not clean_content:
+            clean_content = "Processo concluído com sucesso."
+            response.content = clean_content
+
         if not state.get("incognito", False):
             logger = SessionLogger(state["session_id"])
             # Log minimal event info instead of full response string

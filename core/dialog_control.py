@@ -31,6 +31,27 @@ def is_path_verified(path: str, verified_paths: set, is_directory_op: bool = Fal
             return True
     return False
 
+def detect_missing_action(content: str) -> bool:
+    """Detect if the agent expressed intent to act but didn't call a tool."""
+    if not content:
+        return False
+    
+    content_lower = content.lower()
+    intent_keywords = [
+        "vou solicitar", "delegar", "solicitar ao", "call the", "delegate to", 
+        "i will", "preciso envolver", "let me", "deixe-me", "vou", "going to",
+        "proceder", "proceed", "iniciar", "start"
+    ]
+    action_keywords = [
+        "escrever", "alterar", "deletar", "executar", "write", "modify", "delete", "execute",
+        "update", "atualizar", "mudar", "change", "create", "criar", "refatorar", "refactor"
+    ]
+    
+    has_intent = any(kw in content_lower for kw in intent_keywords)
+    requires_validation = any(kw in content_lower for kw in action_keywords)
+    
+    return has_intent or requires_validation
+
 def should_continue(state: HarnessState) -> Literal["tools", "compact", "reflection", "planner", "limit_handler", "__end__"]:
     """Determine the next step in the dialog flow.
 
@@ -85,8 +106,7 @@ def should_continue(state: HarnessState) -> Literal["tools", "compact", "reflect
         if any(kw in content.lower() for kw in pivot_keywords):
             return "planner"
 
-        intent_keywords = ["vou solicitar", "delegar", "solicitar ao", "call the", "delegate to", "i will", "preciso envolver"]
-        if any(kw in content.lower() for kw in intent_keywords):
+        if detect_missing_action(content):
             return "reflection"
 
     return "__end__"

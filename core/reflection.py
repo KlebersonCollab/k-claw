@@ -60,28 +60,17 @@ async def reflect_on_action(state: HarnessState) -> dict:
             }
 
     # Standard reflection (intent/validation)
-    intent_keywords = ["vou solicitar", "delegar", "solicitar ao", "call the", "delegate to", "i will", "preciso envolver"]
-    action_keywords = ["escrever", "alterar", "deletar", "executar", "write", "modify", "delete", "execute"]
-
-    has_intent = any(kw in content.lower() for kw in intent_keywords)
-    requires_validation = any(kw in content.lower() for kw in action_keywords)
+    from .dialog_control import detect_missing_action
     
-    if (has_intent or requires_validation) and not last_msg.tool_calls:
+    if detect_missing_action(content) and not last_msg.tool_calls:
         await emit_event(EventType.THINKING_START, {"agent": "Reflection"})
         
-        correction_parts = []
-        if has_intent:
-            correction_parts.append(
-                "ACTION REQUIRED: You expressed intent to act but didn't call a tool. "
-                "Execute the tool call immediately (e.g., `delegate_to_agent`)."
-            )
-        
-        if requires_validation:
-            correction_parts.append(
-                "EPISTEMOLOGICAL CHECK: Before performing this technical action, "
-                "you MUST explicitly list your ASSUMPTIONS (premises). "
-                "Verify file paths and module structure in the `GLOBAL BLACKBOARD` or via `grep_search` before acting."
-            )
+        correction_parts = [
+            "ACTION REQUIRED: You expressed intent to act but didn't call a tool. "
+            "Execute the tool call immediately (e.g., `write_file`, `replace_string`, `delegate_to_agent`).",
+            "EPISTEMOLOGICAL CHECK: Before performing any technical action, "
+            "you MUST explicitly list your ASSUMPTIONS (premises) and verify file paths."
+        ]
             
         await emit_event(EventType.THINKING_END, {"agent": "Reflection"})
         return {

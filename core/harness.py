@@ -1,5 +1,6 @@
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import AIMessage
 from .state import HarnessState
 from .model_caller import call_model
 from .planner import plan_task
@@ -11,6 +12,28 @@ from .compaction import compact_context
 
 # Initialize memory saver for persistence
 checkpointer = MemorySaver()
+
+async def handle_limit(state: HarnessState) -> dict:
+    """Handle reaching the iteration limit."""
+    scratchpad = state.get("scratchpad", [])
+    last_intent = ""
+    if scratchpad:
+        last_msg = scratchpad[-1]
+        if isinstance(last_msg, AIMessage):
+            if last_msg.tool_calls:
+                last_intent = f"Attempting tools: {[tc['name'] for tc in last_msg.tool_calls]}"
+            if last_msg.content:
+                last_intent += f" | {last_msg.content}"
+    
+    warning = (
+        f"\n\n[SYSTEM STOP] Max iterations reached ({state.get('max_iterations', 50)}). "
+        "The task was terminated for safety. Some steps might be missing.\n"
+        f"Last known intent: {last_intent}"
+    )
+    return {
+        "messages": [AIMessage(content=warning)],
+        "scratchpad": None
+    }
 
 def should_plan(state: HarnessState) -> str:
     """Decide if we should go to planning or agent node."""
@@ -28,6 +51,7 @@ def create_harness():
     workflow.add_node("compact", compact_context)
     workflow.add_node("reflection", reflect_on_action)
     workflow.add_node("post_mortem", run_post_mortem)
+    workflow.add_node("limit_handler", handle_limit)
 
     # Set Entry Point with conditional routing
     workflow.add_conditional_edges(
@@ -48,9 +72,13 @@ def create_harness():
             "compact": "compact",
             "reflection": "reflection",
             "planner": "planner",
+            "limit_handler": "limit_handler",
             "__end__": "post_mortem"
         }
     )
+
+    # Edge from limit_handler to post_mortem
+    workflow.add_edge("limit_handler", "post_mortem")
 
     # Edge from post_mortem to actual end
     workflow.add_edge("post_mortem", END)

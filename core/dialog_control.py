@@ -31,7 +31,7 @@ def is_path_verified(path: str, verified_paths: set, is_directory_op: bool = Fal
             return True
     return False
 
-def should_continue(state: HarnessState) -> Literal["tools", "compact", "reflection", "planner", "__end__"]:
+def should_continue(state: HarnessState) -> Literal["tools", "compact", "reflection", "planner", "limit_handler", "__end__"]:
     """Determine the next step in the dialog flow.
 
     Args:
@@ -42,14 +42,16 @@ def should_continue(state: HarnessState) -> Literal["tools", "compact", "reflect
         "compact" if context needs to be compacted,
         "reflection" if the agent might have missed a tool call,
         "planner" if a pivot is requested,
+        "limit_handler" if iteration limit is reached,
         "__end__" if the conversation should end.
     """
     scratchpad = state.get("scratchpad", [])
 
     # Use max_iterations from state (default to 50 if not present)
     max_iters = state.get("max_iterations", 50)
-    if state["iteration_count"] > max_iters:
-        return "__end__"
+    if state["iteration_count"] >= max_iters:
+        # If we hit the limit, we must end, but let's go via limit_handler
+        return "limit_handler"
 
     if scratchpad and scratchpad[-1].tool_calls:
         # EPISTEMOLOGICAL LOCK: If any tool is destructive, check if verified
